@@ -1,47 +1,49 @@
 import { useMemo, useState } from 'react';
-import toast from 'react-hot-toast';
-import { apiError } from '../../lib/apiError';
+import { View, Text, FlatList, RefreshControl } from 'react-native';
+import Animated from 'react-native-reanimated';
+import { useRouter } from 'expo-router';
 import {
   useCuentas, useEspecialidades, useCrearUsuario, useActualizarUsuario, useResetPassword, useEliminarUsuario,
 } from '../../hooks';
-import { useAuthStore } from '../../store/useAuthStore';
-import { PageTransition } from '../../components/PageTransition';
+import { useAuthStore } from '../../hooks/useAuthStore';
 import {
-  Card, Button, Dialog, ConfirmDialog, Input, PasswordInput, Select, SearchInput, PageHeader,
-  EmptyState, SkeletonTable, Menu, Tabs, Avatar,
-  Table, THead, TH, TBody, TR, TD,
-} from '../../ui';
-import { IconPlus, IconUsers, IconEdit, IconTrash, IconDots, IconKey, IconAlert, IconSparkle } from '../../ui/icons';
-import { cn } from '../../lib/cn';
+  Card, Button, Input, PasswordInput, Chip, Avatar, Sheet, ScreenHeader, SegmentedTabs, EmptyState,
+  Skeleton, confirm, actionSheet, toast,
+  IconUserPlus, IconUsers, IconSearch, IconKey, IconMore,
+} from '../../components/ui';
+import { PressableScale, stagger } from '../../lib/motion';
+import { colors } from '../../lib/theme';
+import { apiError } from '../../lib/apiError';
 import type { Cuenta } from '../../services';
 
 type RoleFilter = 'TODOS' | 'PATIENT' | 'MEDICO' | 'ADMIN';
+type Role = 'PATIENT' | 'MEDICO' | 'ADMIN';
 const ROLE_LABEL: Record<string, string> = { PATIENT: 'Paciente', MEDICO: 'Médico', ADMIN: 'Admin' };
-const ROLE_TONE: Record<string, string> = {
-  PATIENT: 'bg-info-soft text-info-text',
-  MEDICO: 'bg-brand-100 text-brand-800',
-  ADMIN: 'bg-slate-900 text-white',
+const ROLE_BADGE: Record<string, string> = {
+  PATIENT: 'bg-slate-100 text-slate-600',
+  MEDICO: 'bg-brand-50 text-brand-700',
+  ADMIN: 'bg-rail text-white',
 };
 
 const EMPTY_FORM = {
   email: '', password: '', nombre: '', apellido: '', dni: '', telefono: '',
-  role: 'PATIENT' as 'PATIENT' | 'MEDICO' | 'ADMIN', matricula: '', especialidadId: '',
+  role: 'PATIENT' as Role, matricula: '', especialidadId: '',
 };
 
-export default function AdminUsuarios() {
+export default function UsuariosScreen() {
+  const router = useRouter();
   const yo = useAuthStore(s => s.user);
+
   const [tab, setTab] = useState<RoleFilter>('TODOS');
   const [busqueda, setBusqueda] = useState('');
   const [modal, setModal] = useState<'crear' | 'editar' | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editando, setEditando] = useState<Cuenta | null>(null);
-  const [error, setError] = useState('');
   const [resetTarget, setResetTarget] = useState<Cuenta | null>(null);
   const [nuevaPass, setNuevaPass] = useState('');
-  const [eliminando, setEliminando] = useState<Cuenta | null>(null);
 
   const role = tab === 'TODOS' ? undefined : tab;
-  const { data: cuentas, isLoading } = useCuentas(role);
+  const { data: cuentas, isLoading, isRefetching, refetch } = useCuentas(role);
   const { data: especialidades } = useEspecialidades();
   const crear = useCrearUsuario();
   const actualizar = useActualizarUsuario();
@@ -54,24 +56,24 @@ export default function AdminUsuarios() {
     [cuentas, busqueda],
   );
 
-  const openCrear = () => { setForm(EMPTY_FORM); setError(''); setModal('crear'); };
+  const openCrear = () => { setForm(EMPTY_FORM); setModal('crear'); };
   const openEditar = (c: Cuenta) => {
     setEditando(c);
     setForm({ ...EMPTY_FORM, nombre: c.nombre, apellido: c.apellido, telefono: c.telefono ?? '', role: c.role });
-    setError('');
     setModal('editar');
   };
 
   const handleGuardar = async () => {
     if (modal === 'crear') {
       if (!form.email || !form.password || !form.nombre || !form.apellido || !form.dni) {
-        return setError('Completá email, contraseña, nombre, apellido y DNI');
+        return toast.error('Completá email, contraseña, nombre, apellido y DNI');
       }
       if (form.role === 'MEDICO' && (!form.matricula || !form.especialidadId)) {
-        return setError('Un médico necesita matrícula y especialidad');
+        return toast.error('Un médico necesita matrícula y especialidad');
       }
+    } else if (!form.nombre || !form.apellido) {
+      return toast.error('Nombre y apellido son obligatorios');
     }
-    setError('');
     try {
       if (modal === 'crear') {
         await crear.mutateAsync({
@@ -89,7 +91,7 @@ export default function AdminUsuarios() {
       }
       setModal(null);
     } catch (e) {
-      setError(apiError(e, 'No se pudo guardar'));
+      toast.error(apiError(e, 'No se pudo guardar'));
     }
   };
 
@@ -105,7 +107,7 @@ export default function AdminUsuarios() {
   const handleTogglePuedeCalificar = async (c: Cuenta) => {
     try {
       await actualizar.mutateAsync({ id: c.id, puedeCalificar: !c.puedeCalificar });
-      toast.success(c.puedeCalificar ? 'Calificaciones bloqueadas para este paciente' : 'Calificaciones habilitadas');
+      toast.success(c.puedeCalificar ? 'Calificaciones bloqueadas' : 'Calificaciones habilitadas');
     } catch (e) {
       toast.error(apiError(e, 'No se pudo cambiar el permiso'));
     }
@@ -123,199 +125,161 @@ export default function AdminUsuarios() {
     }
   };
 
-  const handleEliminar = async () => {
-    if (!eliminando) return;
-    try {
-      await eliminar.mutateAsync(eliminando.id);
-      toast.success('Cuenta eliminada');
-      setEliminando(null);
-    } catch (e) {
-      toast.error(apiError(e, 'No se pudo eliminar'));
-    }
+  const handleEliminar = async (c: Cuenta) => {
+    const ok = await confirm({
+      title: 'Eliminar cuenta',
+      message: `¿Eliminar la cuenta de ${c.nombre} ${c.apellido}? Esta acción no se puede deshacer.`,
+      confirmText: 'Eliminar', destructive: true,
+    });
+    if (!ok) return;
+    try { await eliminar.mutateAsync(c.id); toast.success('Cuenta eliminada'); }
+    catch (e) { toast.error(apiError(e, 'No se pudo eliminar')); }
   };
 
+  const openAcciones = (c: Cuenta) => {
+    const esYo = c.id === yo?.id;
+    actionSheet({
+      title: `${c.nombre} ${c.apellido}`,
+      message: ROLE_LABEL[c.role],
+      options: [
+        { label: 'Editar', onPress: () => openEditar(c) },
+        { label: 'Resetear contraseña', onPress: () => { setResetTarget(c); setNuevaPass(''); } },
+        ...(c.role === 'PATIENT'
+          ? [{ label: c.puedeCalificar ? 'Bloquear calificaciones' : 'Permitir calificar', onPress: () => handleTogglePuedeCalificar(c) }]
+          : []),
+        ...(esYo ? [] : [{ label: c.activo ? 'Desactivar cuenta' : 'Activar cuenta', onPress: () => handleToggleActivo(c) }]),
+        ...(esYo ? [] : [{ label: 'Eliminar cuenta', onPress: () => handleEliminar(c), destructive: true }]),
+      ],
+    });
+  };
+
+  const count = filtradas.length;
+
   return (
-    <PageTransition>
-      <PageHeader
-        title="Usuarios"
-        description="Gestioná las cuentas de pacientes, médicos y administradores."
-        actions={<Button iconLeft={<IconPlus />} onClick={openCrear}>Nuevo usuario</Button>}
-      />
+    <View style={{ flex: 1, backgroundColor: colors.canvas }}>
+      <ScreenHeader eyebrow="Gestión" title="Usuarios" subtitle="Cuentas de pacientes, médicos y admins" onBack={() => router.back()} />
 
-      <Tabs
-        className="mb-4"
-        value={tab}
-        onChange={v => setTab(v as RoleFilter)}
-        tabs={[
-          { id: 'TODOS', label: 'Todos' },
-          { id: 'PATIENT', label: 'Pacientes' },
-          { id: 'MEDICO', label: 'Médicos' },
-          { id: 'ADMIN', label: 'Admins' },
-        ]}
-      />
-
-      <SearchInput
-        value={busqueda}
-        onChange={e => setBusqueda(e.target.value)}
-        placeholder="Buscar por nombre, email o DNI…"
-        className="max-w-md mb-4"
-      />
+      <View className="px-4 pt-4 gap-3">
+        <Button fullWidth iconLeft={<IconUserPlus size={16} color="#fff" />} onPress={openCrear}>Nuevo usuario</Button>
+        <SegmentedTabs
+          value={tab}
+          onChange={(k) => setTab(k as RoleFilter)}
+          tabs={[
+            { key: 'TODOS', label: 'Todos' },
+            { key: 'PATIENT', label: 'Pacientes' },
+            { key: 'MEDICO', label: 'Médicos' },
+            { key: 'ADMIN', label: 'Admins' },
+          ]}
+        />
+        <Input
+          iconLeft={<IconSearch size={16} color={colors.slate[400]} />}
+          value={busqueda}
+          onChangeText={setBusqueda}
+          placeholder="Buscar por nombre, email o DNI…"
+          autoCapitalize="none"
+        />
+      </View>
 
       {isLoading ? (
-        <SkeletonTable rows={6} cols={5} />
-      ) : !filtradas.length ? (
-        <Card>
-          <EmptyState
-            icon={<IconUsers />}
-            title={busqueda ? 'Sin resultados' : 'Sin cuentas'}
-            description={busqueda ? `Ninguna cuenta coincide con “${busqueda}”.` : 'Creá la primera cuenta con el botón “Nuevo usuario”.'}
-          />
-        </Card>
+        <View className="p-4 gap-2.5">{[0, 1, 2, 3].map(i => <Skeleton key={i} className="h-[88px] rounded-card" />)}</View>
       ) : (
-        <Card className="overflow-hidden">
-          <Table>
-            <THead>
-              <TH>Usuario</TH>
-              <TH>Email</TH>
-              <TH>DNI</TH>
-              <TH>Rol</TH>
-              <TH>Estado</TH>
-              <TH />
-            </THead>
-            <TBody>
-              {filtradas.map(c => {
-                const esYo = c.id === yo?.id;
-                return (
-                  <TR key={c.id}>
-                    <TD>
-                      <div className="flex items-center gap-2.5">
-                        <Avatar size="sm" nombre={c.nombre} apellido={c.apellido} />
-                        <span className="font-medium text-slate-900 whitespace-nowrap">
-                          {c.nombre} {c.apellido}
-                          {c.medico ? <span className="text-slate-400 font-normal"> · Mat. {c.medico.matricula}</span> : null}
-                          {c.role === 'PATIENT' && !c.puedeCalificar ? <span className="text-amber-600 font-normal"> · sin calificar</span> : null}
-                        </span>
-                      </div>
-                    </TD>
-                    <TD>{c.email}</TD>
-                    <TD className="tnum">{c.dni}</TD>
-                    <TD>
-                      <span className={cn('inline-flex px-2 py-0.5 rounded-md text-xs font-semibold whitespace-nowrap', ROLE_TONE[c.role])}>
-                        {ROLE_LABEL[c.role]}
-                      </span>
-                    </TD>
-                    <TD>
-                      <span className={cn('inline-flex items-center gap-1.5 text-xs font-medium', c.activo ? 'text-success-text' : 'text-slate-400')}>
-                        <span className={cn('w-1.5 h-1.5 rounded-full', c.activo ? 'bg-success' : 'bg-slate-300')} />
-                        {c.activo ? 'Activa' : 'Inactiva'}
-                      </span>
-                    </TD>
-                    <TD className="text-right">
-                      <Menu
-                        trigger={<IconDots />}
-                        triggerLabel={`Acciones para ${c.nombre}`}
-                        items={[
-                          { label: 'Editar', icon: <IconEdit />, onSelect: () => openEditar(c) },
-                          { label: 'Resetear contraseña', icon: <IconKey />, onSelect: () => { setResetTarget(c); setNuevaPass(''); } },
-                          ...(c.role === 'PATIENT'
-                            ? [{ label: c.puedeCalificar ? 'Bloquear calificaciones' : 'Permitir calificar', icon: <IconSparkle />, onSelect: () => handleTogglePuedeCalificar(c) }]
-                            : []),
-                          ...(esYo ? [] : [{ label: c.activo ? 'Desactivar' : 'Activar', icon: <IconUsers />, onSelect: () => handleToggleActivo(c) }]),
-                          ...(esYo ? [] : [{ label: 'Eliminar', icon: <IconTrash />, tone: 'danger' as const, onSelect: () => setEliminando(c) }]),
-                        ]}
-                      />
-                    </TD>
-                  </TR>
-                );
-              })}
-            </TBody>
-          </Table>
-        </Card>
+        <FlatList
+          data={filtradas}
+          keyExtractor={c => c.id}
+          contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 110, flexGrow: 1 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.brand[500]} />}
+          ListEmptyComponent={
+            <EmptyState
+              className="pt-12"
+              icon={<IconUsers size={28} color={colors.brand[500]} />}
+              title={busqueda ? 'Sin resultados' : 'Sin cuentas'}
+              message={busqueda ? `Ninguna cuenta coincide con "${busqueda}".` : 'Creá la primera cuenta con "Nuevo usuario".'}
+            />
+          }
+          ListHeaderComponent={count > 0 ? <Text className="text-[12px] text-slate-400 font-medium mb-1 px-1">{count} cuenta{count !== 1 ? 's' : ''}</Text> : null}
+          renderItem={({ item, index }) => (
+            <Animated.View entering={stagger(index)}>
+              <Card className="p-3.5 flex-row items-center">
+                <Avatar nombre={item.nombre} apellido={item.apellido} size={44} />
+                <View className="flex-1 ml-3">
+                  <View className="flex-row items-center gap-2">
+                    <Text className="text-[15px] font-bold text-slate-900 flex-shrink" style={{ letterSpacing: -0.3 }} numberOfLines={1}>{item.nombre} {item.apellido}</Text>
+                    <View className={`px-2 py-0.5 rounded-pill ${ROLE_BADGE[item.role].split(' ')[0]}`}>
+                      <Text className={`text-[10px] font-bold ${ROLE_BADGE[item.role].split(' ')[1]}`}>{ROLE_LABEL[item.role]}</Text>
+                    </View>
+                  </View>
+                  <Text className="text-[12px] text-slate-500 mt-0.5" numberOfLines={1}>{item.email}</Text>
+                  <View className="flex-row items-center gap-2 mt-1">
+                    <Text className="text-[11px] text-slate-400">DNI {item.dni}</Text>
+                    <View className="flex-row items-center gap-1">
+                      <View className={`w-1.5 h-1.5 rounded-full ${item.activo ? 'bg-success' : 'bg-slate-300'}`} />
+                      <Text className={`text-[11px] font-semibold ${item.activo ? 'text-success' : 'text-slate-400'}`}>{item.activo ? 'Activa' : 'Inactiva'}</Text>
+                    </View>
+                    {item.medico ? <Text className="text-[11px] text-slate-400">· Mat. {item.medico.matricula}</Text> : null}
+                  </View>
+                </View>
+                <PressableScale onPress={() => openAcciones(item)} haptic="select" className="w-9 h-9 rounded-lg bg-slate-100 items-center justify-center">
+                  <IconMore size={16} color={colors.slate[600]} />
+                </PressableScale>
+              </Card>
+            </Animated.View>
+          )}
+        />
       )}
 
       {/* Crear / Editar */}
-      <Dialog
-        open={!!modal}
-        onClose={() => setModal(null)}
-        title={modal === 'crear' ? 'Nuevo usuario' : 'Editar usuario'}
-        footer={
+      <Sheet visible={!!modal} onClose={() => setModal(null)} title={modal === 'crear' ? 'Nuevo usuario' : 'Editar usuario'}>
+        <View className="flex-row gap-3 mb-3">
+          <View className="flex-1"><Input label="Nombre" value={form.nombre} onChangeText={v => setForm(f => ({ ...f, nombre: v }))} placeholder="Nombre" /></View>
+          <View className="flex-1"><Input label="Apellido" value={form.apellido} onChangeText={v => setForm(f => ({ ...f, apellido: v }))} placeholder="Apellido" /></View>
+        </View>
+        {modal === 'crear' && (
           <>
-            <Button variant="secondary" onClick={() => setModal(null)}>Cancelar</Button>
-            <Button onClick={handleGuardar} loading={crear.isPending || actualizar.isPending}>
-              {modal === 'crear' ? 'Crear cuenta' : 'Guardar cambios'}
-            </Button>
+            <Input label="Email" value={form.email} onChangeText={v => setForm(f => ({ ...f, email: v }))} placeholder="correo@ejemplo.com" keyboardType="email-address" autoCapitalize="none" className="mb-3" />
+            <View className="flex-row gap-3 mb-3">
+              <View className="flex-1"><Input label="DNI" value={form.dni} onChangeText={v => setForm(f => ({ ...f, dni: v }))} placeholder="12345678" keyboardType="numeric" /></View>
+              <View className="flex-1"><PasswordInput label="Contraseña" value={form.password} onChangeText={v => setForm(f => ({ ...f, password: v }))} placeholder="Mínimo 6" /></View>
+            </View>
           </>
-        }
-      >
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Nombre" required autoFocus value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} />
-            <Input label="Apellido" required value={form.apellido} onChange={e => setForm(f => ({ ...f, apellido: e.target.value }))} />
-          </div>
-          {modal === 'crear' && (
-            <>
-              <Input label="Email" type="email" required value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
-              <div className="grid grid-cols-2 gap-3">
-                <Input label="DNI" required value={form.dni} onChange={e => setForm(f => ({ ...f, dni: e.target.value }))} />
-                <PasswordInput label="Contraseña" required value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} hint="Mínimo 6" />
-              </div>
-            </>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Teléfono" hint="Opcional" value={form.telefono} onChange={e => setForm(f => ({ ...f, telefono: e.target.value }))} />
-            <Select label="Rol" value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value as typeof f.role }))}>
-              <option value="PATIENT">Paciente</option>
-              <option value="MEDICO">Médico</option>
-              <option value="ADMIN">Administrador</option>
-            </Select>
-          </div>
-          {modal === 'crear' && form.role === 'MEDICO' && (
-            <div className="grid grid-cols-2 gap-3">
-              <Input label="Matrícula" required value={form.matricula} onChange={e => setForm(f => ({ ...f, matricula: e.target.value }))} />
-              <Select label="Especialidad" required value={form.especialidadId} onChange={e => setForm(f => ({ ...f, especialidadId: e.target.value }))}>
-                <option value="">Seleccionar…</option>
-                {especialidades?.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-              </Select>
-            </div>
-          )}
-          {modal === 'editar' && editando?.role === 'MEDICO' && form.role !== 'MEDICO' && (
-            <p className="text-[13px] text-slate-400">Esta cuenta tiene ficha de médico vinculada.</p>
-          )}
-          {error && (
-            <div className="flex items-center gap-2.5 bg-danger-soft text-danger-text rounded-field px-3.5 py-3 text-[13px] font-medium">
-              <IconAlert className="shrink-0" />
-              {error}
-            </div>
-          )}
-        </div>
-      </Dialog>
+        )}
+        <Input label="Teléfono" value={form.telefono} onChangeText={v => setForm(f => ({ ...f, telefono: v }))} placeholder="Opcional" keyboardType="phone-pad" className="mb-3" />
+
+        <Text className="text-[13px] font-semibold text-slate-700 mb-2">Rol</Text>
+        <View className="flex-row flex-wrap gap-2 mb-3">
+          {(['PATIENT', 'MEDICO', 'ADMIN'] as Role[]).map(r => (
+            <Chip key={r} label={ROLE_LABEL[r]} active={form.role === r} onPress={() => setForm(f => ({ ...f, role: r }))} />
+          ))}
+        </View>
+
+        {modal === 'crear' && form.role === 'MEDICO' && (
+          <>
+            <Input label="Matrícula" value={form.matricula} onChangeText={v => setForm(f => ({ ...f, matricula: v }))} placeholder="Ej: MN 12345" className="mb-3" />
+            <Text className="text-[13px] font-semibold text-slate-700 mb-2">Especialidad</Text>
+            <View className="flex-row flex-wrap gap-2 mb-4">
+              {especialidades?.map(e => (
+                <Chip key={e.id} label={e.nombre} active={form.especialidadId === e.id} onPress={() => setForm(f => ({ ...f, especialidadId: e.id }))} />
+              ))}
+            </View>
+          </>
+        )}
+        {modal === 'editar' && editando?.role === 'MEDICO' ? (
+          <Text className="text-[12px] text-slate-400 mb-3">Esta cuenta tiene una ficha de médico vinculada.</Text>
+        ) : null}
+
+        <Button fullWidth loading={crear.isPending || actualizar.isPending} onPress={handleGuardar}>
+          {modal === 'crear' ? 'Crear cuenta' : 'Guardar cambios'}
+        </Button>
+      </Sheet>
 
       {/* Resetear contraseña */}
-      <Dialog
-        open={!!resetTarget}
-        onClose={() => setResetTarget(null)}
-        title="Resetear contraseña"
-        description={resetTarget ? `Nueva contraseña para ${resetTarget.nombre} ${resetTarget.apellido}` : undefined}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setResetTarget(null)}>Cancelar</Button>
-            <Button onClick={handleReset} loading={reset.isPending}>Guardar contraseña</Button>
-          </>
-        }
-      >
-        <PasswordInput label="Nueva contraseña" value={nuevaPass} onChange={e => setNuevaPass(e.target.value)} hint="Mínimo 6 caracteres" autoComplete="new-password" />
-      </Dialog>
-
-      <ConfirmDialog
-        open={!!eliminando}
-        onClose={() => setEliminando(null)}
-        onConfirm={handleEliminar}
-        title="Eliminar cuenta"
-        message={eliminando ? `Vas a eliminar la cuenta de ${eliminando.nombre} ${eliminando.apellido}. Esta acción no se puede deshacer.` : undefined}
-        confirmLabel="Eliminar"
-        tone="danger"
-        loading={eliminar.isPending}
-      />
-    </PageTransition>
+      <Sheet visible={!!resetTarget} onClose={() => setResetTarget(null)} title="Resetear contraseña">
+        <Text className="text-[13px] text-slate-500 mb-3">
+          Nueva contraseña para {resetTarget?.nombre} {resetTarget?.apellido}.
+        </Text>
+        <PasswordInput label="Nueva contraseña" value={nuevaPass} onChangeText={setNuevaPass} placeholder="Mínimo 6 caracteres" className="mb-4" />
+        <Button fullWidth loading={reset.isPending} onPress={handleReset} iconLeft={<IconKey size={16} color="#fff" />}>Guardar contraseña</Button>
+      </Sheet>
+    </View>
   );
 }
