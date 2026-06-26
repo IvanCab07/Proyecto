@@ -10,6 +10,7 @@ export { Tabs } from './Tabs';
 export type { Tab } from './Tabs';
 export { Table, THead, TH, TBody, TR, TD } from './Table';
 export { StatusBadge } from './StatusBadge';
+export { Stars } from './Stars';
 export { EmptyState } from './EmptyState';
 export { Skeleton, SkeletonText, SkeletonTable, SkeletonStatCard, SkeletonChart, SkeletonCards } from './Skeleton';
 export { StatCard } from './StatCard';

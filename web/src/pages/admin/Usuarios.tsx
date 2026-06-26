@@ -11,7 +11,7 @@ import {
   EmptyState, SkeletonTable, Menu, Tabs, Avatar,
   Table, THead, TH, TBody, TR, TD,
 } from '../../ui';
-import { IconPlus, IconUsers, IconEdit, IconTrash, IconDots, IconKey, IconAlert } from '../../ui/icons';
+import { IconPlus, IconUsers, IconEdit, IconTrash, IconDots, IconKey, IconAlert, IconSparkle } from '../../ui/icons';
 import { cn } from '../../lib/cn';
 import type { Cuenta } from '../../services';
 
@@ -102,6 +102,15 @@ export default function AdminUsuarios() {
     }
   };
 
+  const handleTogglePuedeCalificar = async (c: Cuenta) => {
+    try {
+      await actualizar.mutateAsync({ id: c.id, puedeCalificar: !c.puedeCalificar });
+      toast.success(c.puedeCalificar ? 'Calificaciones bloqueadas para este paciente' : 'Calificaciones habilitadas');
+    } catch (e) {
+      toast.error(apiError(e, 'No se pudo cambiar el permiso'));
+    }
+  };
+
   const handleReset = async () => {
     if (!resetTarget) return;
     if (nuevaPass.length < 6) return toast.error('La contraseña debe tener al menos 6 caracteres');
@@ -184,6 +193,7 @@ export default function AdminUsuarios() {
                         <span className="font-medium text-slate-900 whitespace-nowrap">
                           {c.nombre} {c.apellido}
                           {c.medico ? <span className="text-slate-400 font-normal"> · Mat. {c.medico.matricula}</span> : null}
+                          {c.role === 'PATIENT' && !c.puedeCalificar ? <span className="text-amber-600 font-normal"> · sin calificar</span> : null}
                         </span>
                       </div>
                     </TD>
@@ -207,6 +217,9 @@ export default function AdminUsuarios() {
                         items={[
                           { label: 'Editar', icon: <IconEdit />, onSelect: () => openEditar(c) },
                           { label: 'Resetear contraseña', icon: <IconKey />, onSelect: () => { setResetTarget(c); setNuevaPass(''); } },
+                          ...(c.role === 'PATIENT'
+                            ? [{ label: c.puedeCalificar ? 'Bloquear calificaciones' : 'Permitir calificar', icon: <IconSparkle />, onSelect: () => handleTogglePuedeCalificar(c) }]
+                            : []),
                           ...(esYo ? [] : [{ label: c.activo ? 'Desactivar' : 'Activar', icon: <IconUsers />, onSelect: () => handleToggleActivo(c) }]),
                           ...(esYo ? [] : [{ label: 'Eliminar', icon: <IconTrash />, tone: 'danger' as const, onSelect: () => setEliminando(c) }]),
                         ]}

@@ -71,15 +71,19 @@ export default function PacienteSolicitar() {
   const crear = useCrearTurno();
 
   const horasOcupadas = disponibilidad?.horasOcupadas ?? [];
-  const horasDisponibles = HORAS.filter(h => !horasOcupadas.includes(h));
+  const sobreturnosPorHora = disponibilidad?.sobreturnos ?? {};
+  // Si el horario elegido está ocupado, se pide como sobreturno (lista de espera)
+  const esSobreturno = !!hora && horasOcupadas.includes(hora);
 
   const today = new Date().toISOString().split('T')[0];
 
   const handleConfirmar = async () => {
     setError('');
     try {
-      await crear.mutateAsync({ medicoId, fecha, hora, motivo: motivo || undefined });
-      toast.success('Turno solicitado correctamente');
+      // El backend espera un datetime ISO completo; mandamos el mediodía de la fecha elegida.
+      const fechaISO = new Date(`${fecha}T12:00:00`).toISOString();
+      await crear.mutateAsync({ medicoId, fecha: fechaISO, hora, motivo: motivo || undefined, esSobreturno });
+      toast.success(esSobreturno ? 'Sobreturno solicitado. Quedaste en lista de espera.' : 'Turno solicitado correctamente');
       navigate('/paciente/turnos');
     } catch (e) {
       setError(apiError(e, 'Error al crear el turno'));
@@ -174,37 +178,43 @@ export default function PacienteSolicitar() {
                 />
                 {fecha && (
                   <div>
-                    <p className="text-[13px] font-semibold text-slate-700 mb-2">Horarios disponibles</p>
-                    {horasDisponibles.length === 0 ? (
-                      <p className="text-sm text-slate-400 py-3">
-                        No quedan horarios libres para esta fecha. Probá con otro día.
-                      </p>
-                    ) : (
-                      <div className="grid grid-cols-4 gap-2">
-                        {HORAS.map(h => {
-                          const ocupado = horasOcupadas.includes(h);
-                          const activo = hora === h;
-                          return (
-                            <button
-                              key={h}
-                              type="button"
-                              disabled={ocupado}
-                              onClick={() => setHora(h)}
-                              className={cn(
-                                'h-9 rounded-lg text-[13px] font-semibold tnum transition-all duration-150',
-                                activo
-                                  ? 'bg-brand-600 text-white shadow-btn'
-                                  : ocupado
-                                    ? 'bg-slate-50 text-slate-300 line-through cursor-not-allowed'
-                                    : 'bg-surface ring-1 ring-inset ring-slate-200 text-slate-600 hover:ring-slate-400 hover:text-slate-900',
-                              )}
-                            >
-                              {h}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
+                    <p className="text-[13px] font-semibold text-slate-700 mb-2">Elegí un horario</p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {HORAS.map(h => {
+                        const ocupado = horasOcupadas.includes(h);
+                        const activo = hora === h;
+                        const enEspera = sobreturnosPorHora[h] ?? 0;
+                        return (
+                          <button
+                            key={h}
+                            type="button"
+                            onClick={() => setHora(h)}
+                            title={ocupado ? 'Horario ocupado — lo podés tomar como sobreturno' : undefined}
+                            className={cn(
+                              'h-9 rounded-lg text-[13px] font-semibold tnum transition-all duration-150 relative',
+                              activo
+                                ? ocupado
+                                  ? 'bg-amber-500 text-white shadow-btn'
+                                  : 'bg-brand-600 text-white shadow-btn'
+                                : ocupado
+                                  ? 'bg-amber-50 ring-1 ring-inset ring-amber-300 text-amber-700 hover:ring-amber-400'
+                                  : 'bg-surface ring-1 ring-inset ring-slate-200 text-slate-600 hover:ring-slate-400 hover:text-slate-900',
+                            )}
+                          >
+                            {h}
+                            {enEspera > 0 && (
+                              <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold grid place-items-center ring-2 ring-surface">
+                                {enEspera}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-3 flex items-center gap-2 text-[12px] text-slate-500">
+                      <span className="inline-block w-3 h-3 rounded bg-amber-50 ring-1 ring-amber-300" />
+                      Horario ocupado: lo podés tomar como <span className="font-semibold text-amber-700">sobreturno</span> (lista de espera).
+                    </p>
                   </div>
                 )}
                 <div className="flex justify-between mt-auto pt-6">
@@ -234,6 +244,15 @@ export default function PacienteSolicitar() {
                     </div>
                   ))}
                 </dl>
+                {esSobreturno && (
+                  <div className="flex items-start gap-2.5 bg-amber-50 text-amber-800 ring-1 ring-amber-200 rounded-field px-3.5 py-3 text-[13px] font-medium mb-4">
+                    <IconAlert className="shrink-0 mt-0.5" />
+                    <span>
+                      Ese horario ya está ocupado. Vas a quedar como <span className="font-semibold">sobreturno</span> en
+                      lista de espera: si el turno se cancela o el paciente no asiste, se te cede automáticamente y te avisamos.
+                    </span>
+                  </div>
+                )}
                 <Textarea
                   label="Motivo de la consulta"
                   hint="Opcional — ayuda al médico a prepararse"
@@ -253,7 +272,7 @@ export default function PacienteSolicitar() {
                     Volver
                   </Button>
                   <Button onClick={handleConfirmar} loading={crear.isPending}>
-                    Confirmar turno
+                    {esSobreturno ? 'Confirmar sobreturno' : 'Confirmar turno'}
                   </Button>
                 </div>
               </motion.div>

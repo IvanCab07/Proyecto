@@ -21,6 +21,7 @@ import AdminPacientes from './pages/admin/Pacientes';
 import AdminMedicos from './pages/admin/Medicos';
 import AdminEspecialidades from './pages/admin/Especialidades';
 import AdminUsuarios from './pages/admin/Usuarios';
+import AdminCalificaciones from './pages/admin/Calificaciones';
 import AdminReportes from './pages/admin/Reportes';
 import AdminAjustes from './pages/admin/Ajustes';
 
@@ -71,6 +72,7 @@ function AppRouter() {
       <Route path="/admin/medicos"        element={<ProtectedRoute role="ADMIN"><AdminMedicos /></ProtectedRoute>} />
       <Route path="/admin/especialidades" element={<ProtectedRoute role="ADMIN"><AdminEspecialidades /></ProtectedRoute>} />
       <Route path="/admin/usuarios"       element={<ProtectedRoute role="ADMIN"><AdminUsuarios /></ProtectedRoute>} />
+      <Route path="/admin/calificaciones" element={<ProtectedRoute role="ADMIN"><AdminCalificaciones /></ProtectedRoute>} />
       <Route path="/admin/reportes"       element={<ProtectedRoute role="ADMIN"><AdminReportes /></ProtectedRoute>} />
       <Route path="/admin/ajustes"        element={<ProtectedRoute role="ADMIN"><AdminAjustes /></ProtectedRoute>} />
 

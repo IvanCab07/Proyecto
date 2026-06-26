@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react';
 import {
   IconGrid, IconCalendar, IconCalendarDays, IconUsers, IconStethoscope, IconTag,
-  IconChart, IconSettings, IconHome, IconPlus, IconPill, IconFolder, IconUser, IconShield, IconMapPin,
+  IconChart, IconSettings, IconHome, IconPlus, IconPill, IconFolder, IconUser, IconShield, IconMapPin, IconSparkle,
 } from '../ui/icons';
 
 export interface NavItem {
@@ -36,8 +36,9 @@ export const adminNav: NavGroup[] = [
   {
     label: 'Sistema',
     items: [
-      { to: '/admin/reportes', label: 'Reportes', icon: IconChart },
-      { to: '/admin/ajustes',  label: 'Ajustes',  icon: IconSettings },
+      { to: '/admin/calificaciones', label: 'Calificaciones', icon: IconSparkle },
+      { to: '/admin/reportes',       label: 'Reportes',       icon: IconChart },
+      { to: '/admin/ajustes',        label: 'Ajustes',        icon: IconSettings },
     ],
   },
 ];

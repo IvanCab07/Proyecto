@@ -11,7 +11,11 @@ import { IconCalendar } from '../../ui/icons';
 import { formatFecha } from '../../lib/format';
 import type { Turno } from '../../services';
 
-const ESTADOS = ['PENDIENTE', 'CONFIRMADO', 'COMPLETADO', 'CANCELADO'];
+const ESTADOS = ['PENDIENTE', 'CONFIRMADO', 'COMPLETADO', 'CANCELADO', 'AUSENTE', 'EN_ESPERA'];
+const ESTADO_LABEL: Record<string, string> = {
+  PENDIENTE: 'Pendiente', CONFIRMADO: 'Confirmado', COMPLETADO: 'Completado',
+  CANCELADO: 'Cancelado', AUSENTE: 'Ausente', EN_ESPERA: 'En espera',
+};
 
 const filtroFieldCls =
   'h-10 px-3.5 bg-surface rounded-field text-sm text-slate-700 shadow-xs ring-1 ring-inset ring-slate-200 ' +
@@ -66,7 +70,7 @@ export default function AdminTurnos() {
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <select value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)} className={filtroFieldCls}>
           <option value="">Todos los estados</option>
-          {ESTADOS.map(s => <option key={s} value={s}>{s.charAt(0) + s.slice(1).toLowerCase()}</option>)}
+          {ESTADOS.map(s => <option key={s} value={s}>{ESTADO_LABEL[s]}</option>)}
         </select>
         <input
           type="date"
@@ -167,7 +171,7 @@ export default function AdminTurnos() {
       >
         <div className="space-y-4">
           <Select label="Estado" value={nuevoStatus} onChange={e => setNuevoStatus(e.target.value)}>
-            {ESTADOS.map(s => <option key={s} value={s}>{s.charAt(0) + s.slice(1).toLowerCase()}</option>)}
+            {ESTADOS.map(s => <option key={s} value={s}>{ESTADO_LABEL[s]}</option>)}
           </Select>
           <Textarea
             label="Notas"

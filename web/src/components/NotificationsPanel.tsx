@@ -21,11 +21,13 @@ const TONE: Record<Tone, string> = {
 
 // Cada tipo de notificación → su ícono y color
 const META: Record<NotificationType, { tone: Tone; icon: ReactNode }> = {
-  TURNO_SOLICITADO: { tone: 'warning', icon: <IconClock /> },
-  TURNO_CONFIRMADO: { tone: 'brand',   icon: <IconCalendar /> },
-  TURNO_CANCELADO:  { tone: 'danger',  icon: <IconX /> },
-  TURNO_COMPLETADO: { tone: 'success', icon: <IconCheckCircle /> },
-  RECETA_NUEVA:     { tone: 'success', icon: <IconPill /> },
+  TURNO_SOLICITADO:      { tone: 'warning', icon: <IconClock /> },
+  TURNO_CONFIRMADO:      { tone: 'brand',   icon: <IconCalendar /> },
+  TURNO_CANCELADO:       { tone: 'danger',  icon: <IconX /> },
+  TURNO_COMPLETADO:      { tone: 'success', icon: <IconCheckCircle /> },
+  RECETA_NUEVA:          { tone: 'success', icon: <IconPill /> },
+  SOBRETURNO_SOLICITADO: { tone: 'info',    icon: <IconClock /> },
+  SOBRETURNO_ASIGNADO:   { tone: 'success', icon: <IconCheckCircle /> },
 };
 
 function desde(iso: string): string {

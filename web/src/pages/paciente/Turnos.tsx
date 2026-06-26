@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { useMisTurnos, useCancelarTurno } from '../../hooks';
+import { useMisTurnos, useCancelarTurno, useCrearCalificacion } from '../../hooks';
+import { useAuthStore } from '../../store/useAuthStore';
 import { PageTransition } from '../../components/PageTransition';
 import {
-  Card, Button, Tabs, StatusBadge, EmptyState, ConfirmDialog, Textarea, SkeletonCards, PageHeader,
+  Card, Button, Tabs, StatusBadge, Stars, EmptyState, ConfirmDialog, Dialog, Textarea, SkeletonCards, PageHeader,
 } from '../../ui';
 import { IconCalendar, IconPlus, IconClock } from '../../ui/icons';
 import { listContainer, listItem } from '../../lib/motion';
 import { formatFecha } from '../../lib/format';
+import { apiError } from '../../lib/apiError';
 import type { Turno } from '../../services';
 import toast from 'react-hot-toast';
 
@@ -51,11 +53,14 @@ function NotaBlock({ label, text, cls }: { label?: string; text: string; cls: st
   );
 }
 
-function TurnoCard({ t, onCancelar, onReagendar }: {
+function TurnoCard({ t, onCancelar, onReagendar, onCalificar, puedeCalificar }: {
   t: Turno;
   onCancelar?: () => void;
   onReagendar?: () => void;
+  onCalificar?: () => void;
+  puedeCalificar?: boolean;
 }) {
+  const cancelable = t.status === 'PENDIENTE' || t.status === 'EN_ESPERA';
   return (
     <motion.div variants={listItem}>
       <Card className="p-4 sm:p-5">
@@ -69,27 +74,57 @@ function TurnoCard({ t, onCancelar, onReagendar }: {
                 </p>
                 <p className="text-[13px] text-slate-500 mt-0.5">{t.medico.especialidad.nombre}</p>
               </div>
-              <StatusBadge status={t.status} />
+              <div className="flex items-center gap-1.5 shrink-0">
+                {t.esSobreturno && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-pill text-xs font-semibold bg-amber-100 text-amber-700 whitespace-nowrap">
+                    Sobreturno
+                  </span>
+                )}
+                <StatusBadge status={t.status} />
+              </div>
             </div>
             <p className="flex items-center gap-1.5 text-[13px] text-slate-500 mt-2">
               <IconClock className="w-3.5 h-3.5 text-slate-400" />
               {formatFecha(t.fecha)} · {t.hora} hs
             </p>
+            {t.status === 'EN_ESPERA' && (
+              <p className="text-[12px] text-amber-700 mt-1.5">
+                En lista de espera. Si se libera el horario, se te cede automáticamente y te avisamos.
+              </p>
+            )}
             {t.motivo && <p className="text-[13px] text-slate-500 italic mt-2">“{t.motivo}”</p>}
             {t.notas && <NotaBlock label="Nota" text={t.notas} cls="bg-brand-50 text-brand-800" />}
             {t.diagnostico && <NotaBlock label="Diagnóstico" text={t.diagnostico} cls="bg-success-soft text-success-text" />}
             {t.razonCancelacion && <NotaBlock text={t.razonCancelacion} cls="bg-danger-soft text-danger-text" />}
 
-            {(onCancelar || onReagendar) && (
+            {/* Calificación: ya hecha (solo lectura) o invitación a calificar */}
+            {t.status === 'COMPLETADO' && t.calificacion && (
+              <div className="mt-2.5 px-3 py-2.5 rounded-lg bg-amber-50 ring-1 ring-amber-100">
+                <div className="flex items-center gap-2">
+                  <Stars value={t.calificacion.estrellas} size={16} />
+                  <span className="text-[12px] font-semibold text-amber-700">Tu calificación</span>
+                </div>
+                {t.calificacion.comentario && (
+                  <p className="text-[13px] text-slate-600 mt-1.5 italic">“{t.calificacion.comentario}”</p>
+                )}
+              </div>
+            )}
+
+            {(onCancelar || onReagendar || onCalificar) && (
               <div className="flex gap-2 mt-3">
-                {t.status === 'PENDIENTE' && onCancelar && (
+                {cancelable && onCancelar && (
                   <Button variant="ghost" size="sm" className="text-danger hover:bg-danger-soft hover:text-danger-text" onClick={onCancelar}>
-                    Cancelar turno
+                    {t.status === 'EN_ESPERA' ? 'Cancelar sobreturno' : 'Cancelar turno'}
                   </Button>
                 )}
-                {t.status === 'CANCELADO' && onReagendar && (
+                {(t.status === 'CANCELADO' || t.status === 'AUSENTE') && onReagendar && (
                   <Button variant="secondary" size="sm" onClick={onReagendar}>
                     Reagendar
+                  </Button>
+                )}
+                {t.status === 'COMPLETADO' && !t.calificacion && puedeCalificar && onCalificar && (
+                  <Button variant="secondary" size="sm" onClick={onCalificar}>
+                    Calificar atención
                   </Button>
                 )}
               </div>
@@ -124,14 +159,19 @@ export default function PacienteTurnos() {
   const navigate = useNavigate();
   const { data: turnos, isLoading } = useMisTurnos();
   const cancelar = useCancelarTurno();
+  const calificar = useCrearCalificacion();
+  const puedeCalificar = useAuthStore(s => s.user?.puedeCalificar !== false);
 
   const [tab, setTab] = useState('proximos');
   const [turnoACancelar, setTurnoACancelar] = useState<Turno | null>(null);
   const [razon, setRazon] = useState('');
+  const [turnoACalificar, setTurnoACalificar] = useState<Turno | null>(null);
+  const [estrellas, setEstrellas] = useState(0);
+  const [comentario, setComentario] = useState('');
 
-  const proximos = turnos?.filter(t => t.status === 'PENDIENTE' || t.status === 'CONFIRMADO')
+  const proximos = turnos?.filter(t => t.status === 'PENDIENTE' || t.status === 'CONFIRMADO' || t.status === 'EN_ESPERA')
     .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime()) ?? [];
-  const historial = turnos?.filter(t => t.status === 'COMPLETADO' || t.status === 'CANCELADO')
+  const historial = turnos?.filter(t => t.status === 'COMPLETADO' || t.status === 'CANCELADO' || t.status === 'AUSENTE')
     .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()) ?? [];
 
   const grupos = groupProximos(proximos);
@@ -146,6 +186,26 @@ export default function PacienteTurnos() {
       setRazon('');
     } catch {
       toast.error('No se pudo cancelar el turno');
+    }
+  };
+
+  const abrirCalificar = (t: Turno) => {
+    setTurnoACalificar(t);
+    setEstrellas(0);
+    setComentario('');
+  };
+
+  const handleCalificar = async () => {
+    if (!turnoACalificar || estrellas < 1) {
+      toast.error('Elegí al menos una estrella');
+      return;
+    }
+    try {
+      await calificar.mutateAsync({ turnoId: turnoACalificar.id, estrellas, comentario: comentario || undefined });
+      toast.success('¡Gracias por tu calificación!');
+      setTurnoACalificar(null);
+    } catch (e) {
+      toast.error(apiError(e, 'No se pudo enviar la calificación'));
     }
   };
 
@@ -209,7 +269,13 @@ export default function PacienteTurnos() {
       ) : (
         <motion.div variants={listContainer} initial="hidden" animate="visible" className="space-y-3">
           {historial.map(t => (
-            <TurnoCard key={t.id} t={t} onReagendar={() => handleReagendar(t)} />
+            <TurnoCard
+              key={t.id}
+              t={t}
+              onReagendar={() => handleReagendar(t)}
+              onCalificar={() => abrirCalificar(t)}
+              puedeCalificar={puedeCalificar}
+            />
           ))}
         </motion.div>
       )}
@@ -245,6 +311,38 @@ export default function PacienteTurnos() {
           </div>
         )}
       </ConfirmDialog>
+
+      <Dialog
+        open={!!turnoACalificar}
+        onClose={() => setTurnoACalificar(null)}
+        title="Calificar atención"
+        description={turnoACalificar
+          ? `Dr. ${turnoACalificar.medico.nombre} ${turnoACalificar.medico.apellido} · ${formatFecha(turnoACalificar.fecha)}`
+          : undefined}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setTurnoACalificar(null)}>Cancelar</Button>
+            <Button onClick={handleCalificar} loading={calificar.isPending} disabled={estrellas < 1}>
+              Enviar calificación
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <p className="text-[13px] font-semibold text-slate-700 mb-2">¿Cómo fue la atención?</p>
+            <Stars value={estrellas} onChange={setEstrellas} size={32} />
+          </div>
+          <Textarea
+            label="Comentario"
+            hint="Opcional — contanos tu experiencia"
+            value={comentario}
+            onChange={e => setComentario(e.target.value)}
+            rows={3}
+            placeholder="Escribí tu opinión…"
+          />
+        </div>
+      </Dialog>
     </PageTransition>
   );
 }
