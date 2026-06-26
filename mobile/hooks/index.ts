@@ -8,11 +8,13 @@ import {
   usersService,
   authService,
   notificationsService,
+  calificacionesService,
   CreateTurnoDTO,
   CreateMedicoDTO,
   CreateRecetaDTO,
   CreateUsuarioDTO,
   UpdateUsuarioDTO,
+  CreateCalificacionDTO,
   ActualizarPerfilDTO,
   CambiarPasswordDTO,
 } from '../services';
@@ -283,6 +285,24 @@ export const useMiAgenda = () =>
 
 export const useRecetasMedico = () =>
   useQuery({ queryKey: ['recetas-medico'], queryFn: recetasService.delMedico });
+
+// ── Calificaciones ──
+export const useCrearCalificacion = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateCalificacionDTO) => calificacionesService.crear(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['mis-turnos'] });
+      qc.invalidateQueries({ queryKey: ['calificaciones'] });
+    },
+  });
+};
+
+export const useCalificacionesAdmin = () =>
+  useQuery({ queryKey: ['calificaciones'], queryFn: calificacionesService.listadoAdmin });
+
+export const useMisCalificacionesMedico = () =>
+  useQuery({ queryKey: ['calificaciones-medico'], queryFn: calificacionesService.miMedico });
 
 // ── Notificaciones ──
 export const useNotifications = () =>

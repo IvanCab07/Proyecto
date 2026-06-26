@@ -72,6 +72,9 @@ export const IconExternal = makeF('external-link');
 export const IconClipboard = makeF('clipboard');
 export const IconKey = makeF('key');
 
+export const IconStar = makeM('star');
+export const IconStarOutline = makeM('star-outline');
+
 // Médicos
 export const IconPill = makeM('pill');
 export const IconStethoscope = makeM('stethoscope');

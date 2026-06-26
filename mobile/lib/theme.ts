@@ -24,10 +24,11 @@ export const colors = {
   white: '#FFFFFF',
 } as const;
 
-export type TurnoStatus = 'PENDIENTE' | 'CONFIRMADO' | 'COMPLETADO' | 'CANCELADO';
+export type TurnoStatus = 'PENDIENTE' | 'CONFIRMADO' | 'COMPLETADO' | 'CANCELADO' | 'EN_ESPERA' | 'AUSENTE';
 
 // Fuente única de verdad de los colores por estado (alineado con la web):
-// PENDIENTE→warning, CONFIRMADO→brand, COMPLETADO→success, CANCELADO→danger.
+// PENDIENTE→warning, CONFIRMADO→brand, COMPLETADO→success, CANCELADO→danger,
+// EN_ESPERA (sobreturno)→info, AUSENTE (no-show)→slate.
 export const STATUS: Record<TurnoStatus, {
   label: string; pillBg: string; pillText: string; dot: string; strip: string; soft: string;
 }> = {
@@ -35,6 +36,8 @@ export const STATUS: Record<TurnoStatus, {
   CONFIRMADO: { label: 'Confirmado', pillBg: colors.brand[100],   pillText: colors.brand[800],   dot: colors.brand[600],     strip: colors.brand[600],     soft: colors.brand[50] },
   COMPLETADO: { label: 'Completado', pillBg: colors.success.soft, pillText: colors.success.text, dot: colors.success.DEFAULT, strip: colors.success.DEFAULT, soft: colors.success.soft },
   CANCELADO:  { label: 'Cancelado',  pillBg: colors.danger.soft,  pillText: colors.danger.text,  dot: colors.danger.DEFAULT,  strip: colors.danger.DEFAULT,  soft: colors.danger.soft },
+  EN_ESPERA:  { label: 'En espera',  pillBg: colors.info.soft,    pillText: colors.info.text,    dot: colors.info.DEFAULT,    strip: colors.info.DEFAULT,    soft: colors.info.soft },
+  AUSENTE:    { label: 'Ausente',    pillBg: colors.slate[100],   pillText: colors.slate[500],   dot: colors.slate[400],      strip: colors.slate[400],      soft: colors.slate[100] },
 };
 
 // Sombras como estilo RN (shadow* en iOS, elevation en Android).

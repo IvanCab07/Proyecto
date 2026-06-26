@@ -7,7 +7,7 @@ import { getApiUrl, pingHealth } from '../../../services/api';
 import {
   Card, Avatar, Button, Input, PasswordInput, Sheet, Spinner, ScreenHeader, confirm, toast,
   IconUser, IconEdit, IconLock, IconLogout, IconServer, IconWifi, IconCheckCircle, IconAlertCircle, IconActivity,
-  IconUsers, IconTag, IconShield, IconChevronRight,
+  IconUsers, IconTag, IconShield, IconChevronRight, IconStar,
 } from '../../../components/ui';
 import { SeguridadSection } from '../../../components/SeguridadSection';
 import { PressableScale } from '../../../lib/motion';
@@ -93,7 +93,8 @@ export default function AjustesScreen() {
           <Card className="p-5">
             <SectionHead icon={<IconShield size={15} color={colors.brand[600]} />} title="Gestión" />
             <NavRow icon={<IconUsers size={16} color={colors.brand[600]} />} label="Usuarios y cuentas" desc="Crear, editar y dar de baja" onPress={() => router.push('/admin/usuarios')} />
-            <NavRow icon={<IconTag size={16} color={colors.brand[600]} />} label="Especialidades" desc="Catálogo médico" onPress={() => router.push('/admin/especialidades')} last />
+            <NavRow icon={<IconTag size={16} color={colors.brand[600]} />} label="Especialidades" desc="Catálogo médico" onPress={() => router.push('/admin/especialidades')} />
+            <NavRow icon={<IconStar size={16} color={colors.brand[600]} />} label="Calificaciones" desc="Reseñas y promedio por médico" onPress={() => router.push('/admin/calificaciones')} last />
           </Card>
         </View>
 

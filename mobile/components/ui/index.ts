@@ -7,6 +7,7 @@ export { Chip } from './Chip';
 export { Button } from './Button';
 export type { ButtonProps } from './Button';
 export { StatusBadge } from './StatusBadge';
+export { Stars } from './Stars';
 export { Avatar } from './Avatar';
 export { StatCard } from './StatCard';
 export { EmptyState } from './EmptyState';

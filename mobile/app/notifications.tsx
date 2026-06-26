@@ -5,7 +5,7 @@ import { useAuthStore } from '../hooks/useAuthStore';
 import { useNotifications, useUnreadCount, useMarkNotifRead, useMarkAllNotifRead } from '../hooks';
 import {
   Card, ScreenHeader, EmptyState, Skeleton, toast,
-  IconBell, IconCalendar, IconClock, IconX, IconCheckCircle, IconPill,
+  IconBell, IconCalendar, IconClock, IconX, IconCheckCircle, IconPill, IconStar,
 } from '../components/ui';
 import { PressableScale, stagger } from '../lib/motion';
 import { colors } from '../lib/theme';
@@ -14,11 +14,13 @@ import type { Notification, NotificationType } from '../services';
 type Tone = 'brand' | 'success' | 'warning' | 'danger';
 
 const META: Record<NotificationType, { tone: Tone; Icon: typeof IconBell }> = {
-  TURNO_SOLICITADO: { tone: 'warning', Icon: IconClock },
-  TURNO_CONFIRMADO: { tone: 'brand',   Icon: IconCalendar },
-  TURNO_CANCELADO:  { tone: 'danger',  Icon: IconX },
-  TURNO_COMPLETADO: { tone: 'success', Icon: IconCheckCircle },
-  RECETA_NUEVA:     { tone: 'success', Icon: IconPill },
+  TURNO_SOLICITADO:      { tone: 'warning', Icon: IconClock },
+  TURNO_CONFIRMADO:      { tone: 'brand',   Icon: IconCalendar },
+  TURNO_CANCELADO:       { tone: 'danger',  Icon: IconX },
+  TURNO_COMPLETADO:      { tone: 'success', Icon: IconCheckCircle },
+  RECETA_NUEVA:          { tone: 'success', Icon: IconPill },
+  SOBRETURNO_SOLICITADO: { tone: 'warning', Icon: IconClock },
+  SOBRETURNO_ASIGNADO:   { tone: 'success', Icon: IconStar },
 };
 
 const TONE: Record<Tone, { bg: string; fg: string }> = {

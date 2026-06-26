@@ -11,6 +11,7 @@ export interface User {
   role: 'PATIENT' | 'ADMIN' | 'MEDICO';
   emailVerified: boolean;
   twoFactorEnabled: boolean;
+  puedeCalificar?: boolean;
 }
 
 export interface LoginDTO {
@@ -52,12 +53,15 @@ export interface TwoFactorChallenge { twoFactorRequired: true; challenge: string
 export type LoginResult = AuthResponse | TwoFactorChallenge;
 export interface TwoFactorSetup { secret: string; otpauthUrl: string; qr: string; }
 
+export type TurnoStatus = 'PENDIENTE' | 'CONFIRMADO' | 'CANCELADO' | 'COMPLETADO' | 'EN_ESPERA' | 'AUSENTE';
+
 export interface Turno {
   id: string;
   fecha: string;
   hora: string;
   motivo?: string;
-  status: 'PENDIENTE' | 'CONFIRMADO' | 'CANCELADO' | 'COMPLETADO';
+  status: TurnoStatus;
+  esSobreturno?: boolean;
   medico: {
     id: string;
     nombre: string;
@@ -65,6 +69,7 @@ export interface Turno {
     especialidad: { id: string; nombre: string };
   };
   paciente?: Pick<User, 'id' | 'nombre' | 'apellido' | 'dni'>;
+  calificacion?: Calificacion | null;
   notas?: string;
   razonCancelacion?: string;
   diagnostico?: string;
@@ -75,6 +80,42 @@ export interface CreateTurnoDTO {
   fecha: string;
   hora: string;
   motivo?: string;
+  esSobreturno?: boolean;
+}
+
+export interface Calificacion {
+  id: string;
+  turnoId: string;
+  pacienteId: string;
+  medicoId: string;
+  estrellas: number;
+  comentario?: string | null;
+  createdAt: string;
+}
+
+export interface CreateCalificacionDTO {
+  turnoId: string;
+  estrellas: number;
+  comentario?: string;
+}
+
+export interface CalificacionDetalle extends Calificacion {
+  paciente?: { id: string; nombre: string; apellido: string; dni: string };
+  medico?: { id: string; nombre: string; apellido: string; especialidad: { nombre: string } };
+  turno?: { id: string; fecha: string; hora: string };
+}
+
+export interface PromedioMedico {
+  medicoId: string;
+  nombre: string;
+  especialidad: string;
+  promedio: number;
+  cantidad: number;
+}
+
+export interface CalificacionesAdmin {
+  calificaciones: CalificacionDetalle[];
+  promediosPorMedico: PromedioMedico[];
 }
 
 export interface Medico {
@@ -144,6 +185,7 @@ export interface Cuenta {
   role: 'PATIENT' | 'ADMIN' | 'MEDICO';
   activo: boolean;
   createdAt: string;
+  puedeCalificar: boolean;
   medico?: { id: string; matricula: string; especialidad: { id: string; nombre: string } } | null;
 }
 
@@ -165,6 +207,7 @@ export interface UpdateUsuarioDTO {
   telefono?: string;
   role?: 'PATIENT' | 'ADMIN' | 'MEDICO';
   activo?: boolean;
+  puedeCalificar?: boolean;
 }
 
 export interface AdminStats {
@@ -272,7 +315,7 @@ export const medicosService = {
     api.get<Medico[]>('/medicos/all').then(r => r.data),
 
   disponibilidad: (medicoId: string, fecha: string) =>
-    api.get<{ horasOcupadas: string[] }>(`/medicos/${medicoId}/disponibilidad`, { params: { fecha } }).then(r => r.data),
+    api.get<{ horasOcupadas: string[]; sobreturnos?: Record<string, number> }>(`/medicos/${medicoId}/disponibilidad`, { params: { fecha } }).then(r => r.data),
 
   crear: (data: CreateMedicoDTO) =>
     api.post<Medico>('/medicos', data).then(r => r.data),
@@ -333,6 +376,15 @@ export const usersService = {
     api.delete(`/users/${id}`),
 };
 
+export const calificacionesService = {
+  crear: (data: CreateCalificacionDTO) =>
+    api.post<Calificacion>('/calificaciones', data).then(r => r.data),
+  listadoAdmin: () =>
+    api.get<CalificacionesAdmin>('/calificaciones').then(r => r.data),
+  miMedico: () =>
+    api.get<{ calificaciones: CalificacionDetalle[]; promedio: number; cantidad: number }>('/calificaciones/medico').then(r => r.data),
+};
+
 export const especialidadesService = {
   todas: () =>
     api.get<Especialidad[]>('/especialidades').then(r => r.data),
@@ -348,7 +400,8 @@ export const especialidadesService = {
 };
 
 export type NotificationType =
-  | 'TURNO_SOLICITADO' | 'TURNO_CONFIRMADO' | 'TURNO_CANCELADO' | 'TURNO_COMPLETADO' | 'RECETA_NUEVA';
+  | 'TURNO_SOLICITADO' | 'TURNO_CONFIRMADO' | 'TURNO_CANCELADO' | 'TURNO_COMPLETADO' | 'RECETA_NUEVA'
+  | 'SOBRETURNO_SOLICITADO' | 'SOBRETURNO_ASIGNADO';
 
 export interface Notification {
   id: string;

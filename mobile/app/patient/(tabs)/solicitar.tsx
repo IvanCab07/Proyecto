@@ -51,6 +51,9 @@ export default function SolicitarTurnoScreen() {
 
   const hoy = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
   const horasOcupadas = useMemo(() => new Set(disponibilidad?.horasOcupadas ?? []), [disponibilidad]);
+  const sobreturnosPorHora = disponibilidad?.sobreturnos ?? {};
+  // Si el horario elegido está ocupado, se pide como sobreturno (lista de espera)
+  const esSobreturno = !!hora && horasOcupadas.has(hora);
 
   const goNext = () => { setDir(1); setStep(s => s + 1); };
   const goBack = () => { setDir(-1); setStep(s => s - 1); };
@@ -78,8 +81,8 @@ export default function SolicitarTurnoScreen() {
     if (!medicoId || !fecha || !hora) return toast.error('Completá todos los campos');
     try {
       const fechaISO = new Date(`${fecha}T12:00:00`).toISOString();
-      await crearTurno.mutateAsync({ medicoId, fecha: fechaISO, hora, motivo });
-      toast.success('Turno solicitado');
+      await crearTurno.mutateAsync({ medicoId, fecha: fechaISO, hora, motivo, esSobreturno });
+      toast.success(esSobreturno ? 'Sobreturno solicitado: quedaste en lista de espera' : 'Turno solicitado');
       setDir(-1); setStep(1); setEspecialidadId(''); setMedicoId(''); setFecha(''); setHora(''); setMotivo('');
     } catch (err) {
       toast.error(apiError(err, 'No se pudo crear el turno'));
@@ -198,18 +201,29 @@ export default function SolicitarTurnoScreen() {
 
               {fecha ? (
                 <>
-                  <Text className="text-sm font-bold text-slate-700 mb-3">Horarios disponibles</Text>
-                  <View className="flex-row flex-wrap gap-2 mb-5">
+                  <Text className="text-sm font-bold text-slate-700 mb-3">Elegí un horario</Text>
+                  <View className="flex-row flex-wrap gap-2 mb-2.5">
                     {HORARIOS.map(h => {
                       const ocupado = horasOcupadas.has(h);
                       const sel = hora === h;
+                      const enEspera = sobreturnosPorHora[h] ?? 0;
                       return (
-                        <PressableScale key={h} onPress={() => { if (!ocupado) { setHora(h); haptic.select(); } }} disabled={ocupado} haptic={false}
-                          className={cn('px-4 py-2.5 rounded-field border', sel ? 'bg-brand-600 border-brand-600' : ocupado ? 'bg-slate-100 border-slate-200' : 'bg-surface border-slate-200')}>
-                          <Text className={cn('text-[13px] font-bold', sel ? 'text-white' : ocupado ? 'text-slate-400' : 'text-slate-700')} style={{ textDecorationLine: ocupado ? 'line-through' : 'none' }}>{h}</Text>
+                        <PressableScale key={h} onPress={() => { setHora(h); haptic.select(); }} haptic={false}
+                          className={cn('px-4 py-2.5 rounded-field border',
+                            sel ? (ocupado ? 'bg-amber-500 border-amber-500' : 'bg-brand-600 border-brand-600')
+                                : ocupado ? 'bg-amber-50 border-amber-300' : 'bg-surface border-slate-200')}>
+                          <Text className={cn('text-[13px] font-bold', sel ? 'text-white' : ocupado ? 'text-amber-700' : 'text-slate-700')}>
+                            {h}{enEspera > 0 ? ` ·${enEspera}` : ''}
+                          </Text>
                         </PressableScale>
                       );
                     })}
+                  </View>
+                  <View className="flex-row items-center gap-2 mb-5">
+                    <View className="w-3 h-3 rounded" style={{ backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FCD34D' }} />
+                    <Text className="text-[12px] text-slate-500 flex-1">
+                      Horario ocupado: lo podés tomar como <Text className="font-bold text-amber-700">sobreturno</Text> (lista de espera).
+                    </Text>
                   </View>
                 </>
               ) : null}
@@ -231,6 +245,16 @@ export default function SolicitarTurnoScreen() {
                 <SummaryRow label="Fecha" value={fecha ? new Date(`${fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '-'} />
                 <SummaryRow label="Hora" value={hora ? `${hora} hs` : '-'} last />
               </Card>
+
+              {esSobreturno ? (
+                <View className="flex-row gap-2.5 p-3.5 mb-4 rounded-card" style={{ backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FCD34D' }}>
+                  <IconCalendarCheck size={18} color={colors.warning.DEFAULT} />
+                  <Text className="text-[13px] flex-1" style={{ color: '#92400E' }}>
+                    Ese horario está ocupado. Vas a quedar como <Text className="font-bold">sobreturno</Text> en lista de espera:
+                    si el turno se cancela o el paciente no asiste, se te cede automáticamente y te avisamos.
+                  </Text>
+                </View>
+              ) : null}
 
               <Textarea label="Motivo de consulta (opcional)" placeholder="Describí brevemente el motivo de la consulta…" value={motivo} onChangeText={setMotivo} className="mb-5" />
 

@@ -9,6 +9,7 @@ export default function AdminLayout() {
       <Stack.Screen name="historial" />
       <Stack.Screen name="especialidades" />
       <Stack.Screen name="usuarios" />
+      <Stack.Screen name="calificaciones" />
     </Stack>
   );
 }
