@@ -1,0 +1,25 @@
+{
+  "cli": { "version": ">= 5.9.0" },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://hospital-api.onrender.com/api"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://hospital-api.onrender.com/api",
+        "EXPO_PUBLIC_GOOGLE_MAPS_KEY": ""
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

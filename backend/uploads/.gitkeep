@@ -1,0 +1,3 @@
+# Esta carpeta es donde el backend guarda los estudios subidos.
+# El archivo .gitkeep hace que Git mantenga la carpeta vacía.
+# Los archivos subidos NO se suben a GitHub (ver .gitignore).

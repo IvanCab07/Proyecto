@@ -1,0 +1,29 @@
+# Render Blueprint — Backend (Hospital API)
+# Web Service con Docker. Render lee el Dockerfile multi-stage y, al arrancar, corre
+# `prisma migrate deploy && node dist/index.js` (script start:prod).
+#
+# Deploy: Render → New → Blueprint → elegí el repo del backend.
+# Cargá en el panel los valores marcados `sync: false` (no se versionan).
+# PORT lo inyecta Render automáticamente: el server lo respeta (process.env.PORT).
+services:
+  - type: web
+    name: hospital-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      # MySQL administrado (Aiven / Clever Cloud). Suele exigir TLS:
+      #   mysql://user:pass@host:puerto/db?sslaccept=strict
+      - key: DATABASE_URL
+        sync: false
+      # Frase larga y aleatoria (generala vos, no la reuses entre proyectos).
+      - key: JWT_SECRET
+        sync: false
+      # URL exacta de la web en Render, SIN barra final. Ej: https://hospital-web.onrender.com
+      - key: CORS_ORIGIN
+        sync: false

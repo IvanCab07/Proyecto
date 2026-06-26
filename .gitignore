@@ -1,0 +1,32 @@
+# ============================================================
+# .gitignore — Archivos que Git debe IGNORAR
+# ============================================================
+# Estos archivos NO se suben a GitHub porque:
+# - Son generados automáticamente (node_modules, dist)
+# - Tienen datos privados (.env)
+# - Son temporales o específicos de cada computadora
+# ============================================================
+
+# Dependencias (se regeneran con npm install)
+node_modules/
+
+# Variables de entorno (cada persona tiene las suyas)
+.env
+
+# Archivos compilados
+dist/
+build/
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo

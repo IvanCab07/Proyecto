@@ -1,0 +1,250 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion } from 'motion/react';
+import { useMisTurnos, useCancelarTurno } from '../../hooks';
+import { PageTransition } from '../../components/PageTransition';
+import {
+  Card, Button, Tabs, StatusBadge, EmptyState, ConfirmDialog, Textarea, SkeletonCards, PageHeader,
+} from '../../ui';
+import { IconCalendar, IconPlus, IconClock } from '../../ui/icons';
+import { listContainer, listItem } from '../../lib/motion';
+import { formatFecha } from '../../lib/format';
+import type { Turno } from '../../services';
+import toast from 'react-hot-toast';
+
+function isSameDay(fechaStr: string, ref: Date) {
+  const d = new Date(fechaStr);
+  return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth() && d.getDate() === ref.getDate();
+}
+
+function groupProximos(turnos: Turno[]) {
+  const hoy: Turno[] = [], manana: Turno[] = [], proximos: Turno[] = [];
+  const ahora = new Date();
+  const sigDia = new Date();
+  sigDia.setDate(sigDia.getDate() + 1);
+  turnos.forEach(t => {
+    if (isSameDay(t.fecha, ahora)) hoy.push(t);
+    else if (isSameDay(t.fecha, sigDia)) manana.push(t);
+    else proximos.push(t);
+  });
+  return { hoy, manana, proximos };
+}
+
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+function DateTile({ fecha }: { fecha: string }) {
+  const d = new Date(fecha);
+  return (
+    <div className="w-12 shrink-0 rounded-lg bg-brand-50 ring-1 ring-inset ring-brand-100 text-center py-1.5">
+      <p className="text-lg font-bold leading-tight text-brand-700 tnum">{d.getUTCDate()}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-brand-600">{MESES[d.getUTCMonth()]}</p>
+    </div>
+  );
+}
+
+function NotaBlock({ label, text, cls }: { label?: string; text: string; cls: string }) {
+  return (
+    <div className={`mt-2.5 px-3 py-2 rounded-lg text-[13px] leading-relaxed ${cls}`}>
+      {label && <span className="font-semibold">{label}: </span>}
+      {text}
+    </div>
+  );
+}
+
+function TurnoCard({ t, onCancelar, onReagendar }: {
+  t: Turno;
+  onCancelar?: () => void;
+  onReagendar?: () => void;
+}) {
+  return (
+    <motion.div variants={listItem}>
+      <Card className="p-4 sm:p-5">
+        <div className="flex items-start gap-4">
+          <DateTile fecha={t.fecha} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-semibold text-slate-900 text-sm truncate">
+                  Dr. {t.medico.nombre} {t.medico.apellido}
+                </p>
+                <p className="text-[13px] text-slate-500 mt-0.5">{t.medico.especialidad.nombre}</p>
+              </div>
+              <StatusBadge status={t.status} />
+            </div>
+            <p className="flex items-center gap-1.5 text-[13px] text-slate-500 mt-2">
+              <IconClock className="w-3.5 h-3.5 text-slate-400" />
+              {formatFecha(t.fecha)} · {t.hora} hs
+            </p>
+            {t.motivo && <p className="text-[13px] text-slate-500 italic mt-2">“{t.motivo}”</p>}
+            {t.notas && <NotaBlock label="Nota" text={t.notas} cls="bg-brand-50 text-brand-800" />}
+            {t.diagnostico && <NotaBlock label="Diagnóstico" text={t.diagnostico} cls="bg-success-soft text-success-text" />}
+            {t.razonCancelacion && <NotaBlock text={t.razonCancelacion} cls="bg-danger-soft text-danger-text" />}
+
+            {(onCancelar || onReagendar) && (
+              <div className="flex gap-2 mt-3">
+                {t.status === 'PENDIENTE' && onCancelar && (
+                  <Button variant="ghost" size="sm" className="text-danger hover:bg-danger-soft hover:text-danger-text" onClick={onCancelar}>
+                    Cancelar turno
+                  </Button>
+                )}
+                {t.status === 'CANCELADO' && onReagendar && (
+                  <Button variant="secondary" size="sm" onClick={onReagendar}>
+                    Reagendar
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </Card>
+    </motion.div>
+  );
+}
+
+function Grupo({ titulo, turnos, onCancelar, onReagendar }: {
+  titulo: string;
+  turnos: Turno[];
+  onCancelar: (t: Turno) => void;
+  onReagendar: (t: Turno) => void;
+}) {
+  if (!turnos.length) return null;
+  return (
+    <div className="mb-7">
+      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2.5">{titulo}</p>
+      <div className="space-y-3">
+        {turnos.map(t => (
+          <TurnoCard key={t.id} t={t} onCancelar={() => onCancelar(t)} onReagendar={() => onReagendar(t)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default function PacienteTurnos() {
+  const navigate = useNavigate();
+  const { data: turnos, isLoading } = useMisTurnos();
+  const cancelar = useCancelarTurno();
+
+  const [tab, setTab] = useState('proximos');
+  const [turnoACancelar, setTurnoACancelar] = useState<Turno | null>(null);
+  const [razon, setRazon] = useState('');
+
+  const proximos = turnos?.filter(t => t.status === 'PENDIENTE' || t.status === 'CONFIRMADO')
+    .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime()) ?? [];
+  const historial = turnos?.filter(t => t.status === 'COMPLETADO' || t.status === 'CANCELADO')
+    .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()) ?? [];
+
+  const grupos = groupProximos(proximos);
+  const completados = turnos?.filter(t => t.status === 'COMPLETADO').length ?? 0;
+
+  const handleCancelar = async () => {
+    if (!turnoACancelar) return;
+    try {
+      await cancelar.mutateAsync({ id: turnoACancelar.id, razonCancelacion: razon || undefined });
+      toast.success('Turno cancelado');
+      setTurnoACancelar(null);
+      setRazon('');
+    } catch {
+      toast.error('No se pudo cancelar el turno');
+    }
+  };
+
+  const handleReagendar = (t: Turno) => {
+    navigate(`/paciente/solicitar?prefillEspecialidadId=${t.medico.especialidad.id}&prefillMedicoId=${t.medico.id}`);
+  };
+
+  return (
+    <PageTransition>
+      <PageHeader
+        title="Mis turnos"
+        description={
+          proximos.length > 0
+            ? `${proximos.length} ${proximos.length === 1 ? 'turno próximo' : 'turnos próximos'} · ${completados} completados`
+            : 'No tenés turnos próximos por ahora.'
+        }
+        actions={
+          <Button iconLeft={<IconPlus />} onClick={() => navigate('/paciente/solicitar')}>
+            Solicitar turno
+          </Button>
+        }
+      />
+
+      <Tabs
+        className="mb-6"
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { id: 'proximos', label: 'Próximos', count: proximos.length },
+          { id: 'historial', label: 'Historial', count: historial.length },
+        ]}
+      />
+
+      {isLoading ? (
+        <SkeletonCards count={3} />
+      ) : tab === 'proximos' ? (
+        proximos.length === 0 ? (
+          <EmptyState
+            icon={<IconCalendar />}
+            title="Sin turnos próximos"
+            description="Todavía no tenés turnos pendientes ni confirmados. Solicitá el primero en un minuto."
+            action={
+              <Button iconLeft={<IconPlus />} onClick={() => navigate('/paciente/solicitar')}>
+                Solicitar turno
+              </Button>
+            }
+          />
+        ) : (
+          <motion.div variants={listContainer} initial="hidden" animate="visible">
+            <Grupo titulo="Hoy" turnos={grupos.hoy} onCancelar={setTurnoACancelar} onReagendar={handleReagendar} />
+            <Grupo titulo="Mañana" turnos={grupos.manana} onCancelar={setTurnoACancelar} onReagendar={handleReagendar} />
+            <Grupo titulo="Próximos" turnos={grupos.proximos} onCancelar={setTurnoACancelar} onReagendar={handleReagendar} />
+          </motion.div>
+        )
+      ) : historial.length === 0 ? (
+        <EmptyState
+          icon={<IconClock />}
+          title="Sin historial"
+          description="Acá vas a ver tus turnos completados y cancelados."
+        />
+      ) : (
+        <motion.div variants={listContainer} initial="hidden" animate="visible" className="space-y-3">
+          {historial.map(t => (
+            <TurnoCard key={t.id} t={t} onReagendar={() => handleReagendar(t)} />
+          ))}
+        </motion.div>
+      )}
+
+      <ConfirmDialog
+        open={!!turnoACancelar}
+        onClose={() => { setTurnoACancelar(null); setRazon(''); }}
+        onConfirm={handleCancelar}
+        title="Cancelar turno"
+        confirmLabel="Cancelar turno"
+        cancelLabel="Volver"
+        tone="danger"
+        loading={cancelar.isPending}
+      >
+        {turnoACancelar && (
+          <div className="space-y-4">
+            <div className="px-3.5 py-3 rounded-field bg-slate-50 ring-1 ring-inset ring-slate-200 text-sm">
+              <p className="font-semibold text-slate-900">
+                Dr. {turnoACancelar.medico.nombre} {turnoACancelar.medico.apellido}
+              </p>
+              <p className="text-[13px] text-slate-500 mt-0.5">
+                {formatFecha(turnoACancelar.fecha)} a las {turnoACancelar.hora} hs
+              </p>
+            </div>
+            <Textarea
+              label="Motivo"
+              hint="Opcional"
+              value={razon}
+              onChange={e => setRazon(e.target.value)}
+              rows={3}
+              placeholder="Contanos por qué cancelás…"
+            />
+          </div>
+        )}
+      </ConfirmDialog>
+    </PageTransition>
+  );
+}

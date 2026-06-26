@@ -1,0 +1,22 @@
+# Render Blueprint — Web (Vite + React, Static Site)
+# Compila a /dist y se sirve como sitio estático. El rewrite manda todo a index.html
+# para que el routing del SPA (React Router) funcione al refrescar rutas internas.
+#
+# Deploy: Render → New → Blueprint → elegí el repo de la web.
+# Cargá VITE_API_URL en el panel. OJO: se "hornea" en el build → cambiarla exige redeploy.
+services:
+  - type: web
+    name: hospital-web
+    runtime: static
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    pullRequestPreviewsEnabled: false
+    envVars:
+      # URL https del backend en Render, CON /api al final.
+      # Ej: https://hospital-api.onrender.com/api
+      - key: VITE_API_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

@@ -1,0 +1,222 @@
+// ============================================================
+// 📁 prisma/schema.prisma — ESQUEMA DE LA BASE DE DATOS
+// ============================================================
+// Este archivo define la ESTRUCTURA de la base de datos.
+// Prisma lee este archivo y crea las tablas en MySQL automáticamente.
+//
+// Cada "model" es una TABLA en la base de datos.
+// Cada campo dentro del model es una COLUMNA de esa tabla.
+//
+// Las RELACIONES entre tablas se definen con @relation.
+// Ejemplo: Un User tiene muchos Turnos → User.turnos: Turno[]
+//
+// PARA APLICAR CAMBIOS A LA DB:
+// npx prisma migrate dev --name descripcion_del_cambio
+// ============================================================
+
+// ── Configuración de Prisma ─────────────────────────────────
+
+// El "generator" le dice a Prisma que genere el cliente en JavaScript
+generator client {
+  provider = "prisma-client-js"
+}
+
+// El "datasource" indica qué base de datos usamos y dónde está
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")  // La URL viene del archivo .env
+}
+
+// ── ENUMS (valores fijos) ───────────────────────────────────
+// Un enum es un campo que solo puede tener ciertos valores.
+// Ejemplo: el rol de un usuario solo puede ser PATIENT o ADMIN.
+
+enum Role {
+  PATIENT   // Paciente
+  ADMIN     // Administrador
+  MEDICO    // Médico con cuenta para iniciar sesión
+}
+
+enum TurnoStatus {
+  PENDIENTE   // Recién creado, esperando confirmación
+  CONFIRMADO  // El admin lo confirmó
+  CANCELADO   // El paciente o admin lo canceló
+  COMPLETADO  // La consulta ya se realizó
+}
+
+// ── TABLA: users (Usuarios) ─────────────────────────────────
+// Guarda los datos de todos los usuarios (pacientes y admins).
+model User {
+  id           String   @id @default(uuid())   // ID único generado automáticamente
+  email        String   @unique                 // Email (no puede repetirse)
+  password     String                           // Contraseña encriptada
+  nombre       String                           // Nombre del usuario
+  apellido     String                           // Apellido del usuario
+  dni          String   @unique                 // DNI (no puede repetirse)
+  telefono     String?                          // Teléfono (opcional, el "?" significa eso)
+  role         Role     @default(PATIENT)       // Rol (por defecto es paciente)
+  activo       Boolean  @default(true)          // Si la cuenta está habilitada para ingresar
+
+  // ── Seguridad de cuenta ──
+  emailVerified    Boolean @default(false)      // Si el email fue confirmado por el usuario
+  twoFactorEnabled Boolean @default(false)      // Si activó la verificación en dos pasos (2FA)
+  twoFactorSecret  String?                      // Secreto TOTP (base32) para generar/validar códigos
+
+  createdAt    DateTime @default(now())         // Fecha de creación automática
+  updatedAt    DateTime @updatedAt              // Se actualiza cada vez que se modifica
+
+  // Relaciones: un usuario tiene muchos turnos, estudios y recetas
+  turnos       Turno[]
+  estudios     Estudio[]
+  recetas      Receta[]
+
+  // Tokens de verificación de email / reseteo de contraseña
+  verificationTokens VerificationToken[]
+
+  // Notificaciones in-app del usuario
+  notifications Notification[]
+
+  // Si es un médico con login, su ficha de Medico (opcional)
+  medico       Medico?
+
+  @@map("users")  // Nombre real de la tabla en MySQL
+}
+
+// ── TABLA: notifications ────────────────────────────────────
+// Avisos in-app que el sistema genera en eventos (turnos, recetas).
+enum NotificationType {
+  TURNO_SOLICITADO    // Un paciente pidió un turno (aviso para el admin)
+  TURNO_CONFIRMADO    // El admin/médico confirmó el turno (aviso para el paciente)
+  TURNO_CANCELADO     // Se canceló un turno (aviso para la otra parte)
+  TURNO_COMPLETADO    // La consulta se realizó (aviso para el paciente)
+  RECETA_NUEVA        // Se emitió una receta (aviso para el paciente)
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  titulo    String
+  mensaje   String           @db.Text
+  leida     Boolean          @default(false)
+  data      Json?            // Contexto: { turnoId?, recetaId?, link? }
+  createdAt DateTime         @default(now())
+
+  @@index([userId, leida])
+  @@map("notifications")
+}
+
+// ── Tokens de un solo uso (verificar email, resetear contraseña) ────
+// Guardamos SOLO el hash del token (nunca el valor crudo). El valor real
+// viaja únicamente en el link del email.
+enum TokenType {
+  EMAIL_VERIFY     // Confirmar la dirección de email
+  PASSWORD_RESET   // Restablecer la contraseña olvidada
+}
+
+model VerificationToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique               // sha256 del token crudo
+  type      TokenType
+  expiresAt DateTime                         // Vence tras X minutos
+  usedAt    DateTime?                        // Se marca cuando se consume (un solo uso)
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("verification_tokens")
+}
+
+// ── TABLA: especialidades ───────────────────────────────────
+// Lista de especialidades médicas (Cardiología, Pediatría, etc.)
+model Especialidad {
+  id       String    @id @default(uuid())
+  nombre   String    @unique                    // Nombre de la especialidad (único)
+  medicos  Medico[]                             // Médicos que pertenecen a esta especialidad
+
+  @@map("especialidades")
+}
+
+// ── TABLA: medicos ──────────────────────────────────────────
+// Datos de los médicos del hospital.
+model Medico {
+  id             String       @id @default(uuid())
+  nombre         String
+  apellido       String
+  matricula      String       @unique              // Matrícula profesional (única)
+  especialidadId String                             // ID de su especialidad
+  especialidad   Especialidad @relation(fields: [especialidadId], references: [id])
+  disponible     Boolean      @default(true)        // Si está atendiendo o no
+  createdAt      DateTime     @default(now())
+
+  // Cuenta de usuario vinculada (si el médico inicia sesión). Opcional y única.
+  userId         String?      @unique
+  usuario        User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // Relaciones
+  turnos         Turno[]
+  recetas        Receta[]
+
+  @@map("medicos")
+}
+
+// ── TABLA: turnos ───────────────────────────────────────────
+// Cada turno médico que solicita un paciente.
+model Turno {
+  id          String      @id @default(uuid())
+  pacienteId  String                                // ID del paciente que pidió el turno
+  medicoId    String                                // ID del médico asignado
+  fecha       DateTime                              // Fecha del turno
+  hora        String                                // Hora del turno (formato "HH:MM")
+  motivo           String?                               // Motivo de la consulta (opcional)
+  status           TurnoStatus @default(PENDIENTE)       // Estado actual del turno
+  notas            String?                               // Notas del admin (opcional)
+  razonCancelacion String?                               // Razón de cancelación (opcional)
+  diagnostico      String?                               // Diagnóstico/observaciones al completar
+  createdAt        DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relaciones: a qué paciente y médico pertenece este turno
+  paciente    User        @relation(fields: [pacienteId], references: [id])
+  medico      Medico      @relation(fields: [medicoId], references: [id])
+
+  @@map("turnos")
+}
+
+// ── TABLA: estudios ─────────────────────────────────────────
+// Archivos de estudios médicos que sube el paciente (PDFs, imágenes).
+model Estudio {
+  id          String   @id @default(uuid())
+  pacienteId  String
+  titulo      String                                // Nombre del estudio
+  descripcion String?                               // Descripción opcional
+  archivoUrl  String                                // Ruta al archivo guardado
+  tipoArchivo String                                // Tipo MIME (image/jpeg, application/pdf)
+  fecha       DateTime @default(now())              // Fecha del estudio
+  createdAt   DateTime @default(now())
+
+  paciente    User     @relation(fields: [pacienteId], references: [id])
+
+  @@map("estudios")
+}
+
+// ── TABLA: recetas ──────────────────────────────────────────
+// Recetas médicas emitidas por los médicos.
+model Receta {
+  id           String   @id @default(uuid())
+  pacienteId   String
+  medicoId     String
+  medicamento  String                               // Nombre del medicamento
+  dosis        String                               // Dosis (ej: "500mg cada 8hs")
+  indicacion   String                               // Indicaciones especiales
+  fechaEmision DateTime @default(now())             // Fecha en que se emitió
+  validoHasta  DateTime?                            // Fecha de vencimiento (opcional)
+  createdAt    DateTime @default(now())
+
+  paciente     User     @relation(fields: [pacienteId], references: [id])
+  medico       Medico   @relation(fields: [medicoId], references: [id])
+
+  @@map("recetas")
+}

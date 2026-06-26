@@ -1,0 +1,70 @@
+@import '@fontsource-variable/inter';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-slate-200;
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    @apply bg-canvas font-sans text-slate-900 antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+
+  :focus-visible {
+    outline: 2px solid #0D9488;
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  ::selection {
+    background: #9EF2E3;
+    color: #0C1C1C;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: #CBD5E1;
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: #CBD5E1 transparent;
+  }
+}
+
+@layer utilities {
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-shimmer {
+    animation: none;
+  }
+}
