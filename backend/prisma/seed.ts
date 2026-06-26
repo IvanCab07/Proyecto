@@ -141,11 +141,28 @@ async function main() {
     },
   });
 
+  // Segundo paciente para demostrar el sobreturno (toma un horario ya ocupado por Juan)
+  const paciente2 = await prisma.user.upsert({
+    where: { email: 'paciente2@test.com' },
+    update: {},
+    create: {
+      email: 'paciente2@test.com',
+      password: pacienteHash,
+      nombre: 'Sofía',
+      apellido: 'Gómez',
+      dni: '32987654',
+      telefono: '11 9876-5432',
+      role: 'PATIENT',
+      emailVerified: true,
+    },
+  });
+
   console.log('Usuarios listos:');
   console.log('  admin@admin.com / admin123      (admin)');
   console.log('  admin@hospital.com / admin123   (admin)');
   console.log('  medico@hospital.com / medico123 (médico)');
   console.log('  paciente@test.com / test123     (paciente)');
+  console.log('  paciente2@test.com / test123    (paciente, para sobreturnos)');
 
   // Solo crear turnos de ejemplo si el paciente no tiene ninguno aún
   const turnosExistentes = await prisma.turno.count({ where: { pacienteId: paciente.id } });
@@ -159,6 +176,9 @@ async function main() {
         { pacienteId: paciente.id, medicoId: drGarcia.id,   fecha: manana, hora: '09:00', motivo: 'Control general',    status: 'PENDIENTE' },
         { pacienteId: paciente.id, medicoId: drLopez.id,    fecha: pasado, hora: '14:30', motivo: 'Dolor de garganta',  status: 'CONFIRMADO' },
         { pacienteId: paciente.id, medicoId: drMartinez.id, fecha: new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 7), hora: '10:00', motivo: 'Chequeo anual', status: 'COMPLETADO', notas: 'Todo en orden. Próximo control en 6 meses.' },
+        // Sobreturno de Sofía sobre el horario ya ocupado por Juan (Dra. García, mañana 09:00).
+        // Si Juan cancela o se marca ausente, este sobreturno se confirma automáticamente.
+        { pacienteId: paciente2.id, medicoId: drGarcia.id, fecha: manana, hora: '09:00', motivo: 'Necesito que me vean cuanto antes', status: 'EN_ESPERA', esSobreturno: true },
       ],
     });
 
@@ -168,6 +188,24 @@ async function main() {
         { pacienteId: paciente.id, medicoId: drMartinez.id, medicamento: 'Amoxicilina 500mg',  dosis: '1 cápsula cada 12 horas',      indicacion: 'Completar el tratamiento de 7 días. No suspender.' },
       ],
     });
+
+    // Calificación de ejemplo sobre el turno completado (5★) para ver la feature sin cargar datos a mano.
+    const turnoCompletado = await prisma.turno.findFirst({
+      where: { pacienteId: paciente.id, status: 'COMPLETADO' },
+    });
+    if (turnoCompletado) {
+      await prisma.calificacion.upsert({
+        where: { turnoId: turnoCompletado.id },
+        update: {},
+        create: {
+          turnoId: turnoCompletado.id,
+          pacienteId: paciente.id,
+          medicoId: turnoCompletado.medicoId,
+          estrellas: 5,
+          comentario: 'Excelente atención, muy clara y amable. ¡Recomendado!',
+        },
+      });
+    }
 
     console.log('Datos de ejemplo creados');
   } else {

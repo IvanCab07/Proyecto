@@ -14,7 +14,7 @@ import { WEB_URL } from '../config/env';
 const USER_PUBLIC = {
   id: true, email: true, nombre: true, apellido: true,
   dni: true, telefono: true, role: true,
-  emailVerified: true, twoFactorEnabled: true,
+  emailVerified: true, twoFactorEnabled: true, puedeCalificar: true,
 } as const;
 
 const registerSchema = z.object({

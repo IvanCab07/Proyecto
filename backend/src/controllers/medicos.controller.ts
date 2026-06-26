@@ -109,7 +109,22 @@ export const getDisponibilidad = async (req: Request, res: Response) => {
     select: { hora: true },
   });
 
-  return res.json({ horasOcupadas: turnos.map(t => t.hora) });
+  // Sobreturnos en espera por hora (para mostrar "N en espera" al elegir un horario ocupado)
+  const enEspera = await prisma.turno.findMany({
+    where: {
+      medicoId: id,
+      fecha: { gte: inicioFecha, lte: finFecha },
+      status: 'EN_ESPERA',
+    },
+    select: { hora: true },
+  });
+
+  const sobreturnos: Record<string, number> = {};
+  for (const t of enEspera) {
+    sobreturnos[t.hora] = (sobreturnos[t.hora] ?? 0) + 1;
+  }
+
+  return res.json({ horasOcupadas: turnos.map(t => t.hora), sobreturnos });
 };
 
 // Admin: eliminar médico (solo si no tiene turnos pendientes/confirmados)

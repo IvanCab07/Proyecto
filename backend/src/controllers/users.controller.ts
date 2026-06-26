@@ -14,6 +14,7 @@ const USER_SELECT = {
   telefono: true,
   role: true,
   activo: true,
+  puedeCalificar: true,
   createdAt: true,
   medico: { select: { id: true, matricula: true, especialidad: { select: { id: true, nombre: true } } } },
 } as const;
@@ -123,11 +124,12 @@ export const crearUsuario = async (req: Request, res: Response) => {
 };
 
 const actualizarUsuarioSchema = z.object({
-  nombre:   z.string().min(2).optional(),
-  apellido: z.string().min(2).optional(),
-  telefono: z.string().optional(),
-  role:     z.enum(['PATIENT', 'ADMIN', 'MEDICO']).optional(),
-  activo:   z.boolean().optional(),
+  nombre:         z.string().min(2).optional(),
+  apellido:       z.string().min(2).optional(),
+  telefono:       z.string().optional(),
+  role:           z.enum(['PATIENT', 'ADMIN', 'MEDICO']).optional(),
+  activo:         z.boolean().optional(),
+  puedeCalificar: z.boolean().optional(),  // el admin habilita/revoca que el paciente califique
 });
 
 // ── Admin: editar datos, rol o estado (activo) de una cuenta ──
