@@ -1,11 +1,15 @@
 import { useMemo, useState } from 'react';
-import { View, Text, ScrollView } from 'react-native';
+import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../../hooks/useAuthStore';
-import { useActualizarPerfil, useCambiarPassword, useMiAgenda, useRecetasMedico } from '../../../hooks';
+import {
+  useActualizarPerfil, useCambiarPassword, useMiAgenda, useRecetasMedico,
+  useMiFichaMedico, useActualizarMiDisponibilidad,
+} from '../../../hooks';
 import {
   Card, Avatar, Button, Input, PasswordInput, Sheet, StatCard, ScreenHeader, confirm, toast,
   IconUser, IconEdit, IconLock, IconLogout, IconCalendar, IconCheckCircle, IconPill,
+  IconStethoscope, IconStar, IconChevronRight,
 } from '../../../components/ui';
 import { SeguridadSection } from '../../../components/SeguridadSection';
 import { PressableScale } from '../../../lib/motion';
@@ -14,6 +18,26 @@ import { apiError } from '../../../lib/apiError';
 
 type ActiveModal = 'perfil' | 'password' | null;
 
+function DisponibleSwitch({ checked, onPress, disabled }: { checked: boolean; onPress: () => void; disabled?: boolean }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      hitSlop={8}
+      accessibilityRole="switch"
+      accessibilityState={{ checked }}
+      style={{
+        width: 48, height: 28, borderRadius: 14, padding: 3,
+        backgroundColor: checked ? colors.success.DEFAULT : colors.slate[300],
+        alignItems: checked ? 'flex-end' : 'flex-start', justifyContent: 'center',
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff' }} />
+    </Pressable>
+  );
+}
+
 export default function MedicoPerfil() {
   const { user, logout } = useAuthStore();
   const router = useRouter();
@@ -21,6 +45,18 @@ export default function MedicoPerfil() {
   const cambiarPassword = useCambiarPassword();
   const { data: agenda } = useMiAgenda();
   const { data: recetas } = useRecetasMedico();
+  const { data: ficha } = useMiFichaMedico();
+  const toggleDisponible = useActualizarMiDisponibilidad();
+
+  const disponible = ficha?.disponible ?? false;
+  const handleToggleDisponible = async () => {
+    try {
+      await toggleDisponible.mutateAsync(!disponible);
+      toast.success(!disponible ? 'Quedaste disponible para nuevos turnos' : 'Te marcaste como no disponible');
+    } catch {
+      toast.error('No se pudo actualizar la disponibilidad');
+    }
+  };
 
   const [modal, setModal] = useState<ActiveModal>(null);
   const [perfilForm, setPerfilForm] = useState({ nombre: user?.nombre ?? '', apellido: user?.apellido ?? '', telefono: user?.telefono ?? '' });
@@ -85,6 +121,38 @@ export default function MedicoPerfil() {
           <View className="flex-1"><StatCard label="Recetas" value={recetas?.length ?? 0} icon={<IconPill size={18} color="#fff" />} tone="info" /></View>
         </View>
 
+        {/* Disponibilidad */}
+        <View className="px-4 mt-3.5">
+          <Card className="p-4 flex-row items-center">
+            <View className={`w-10 h-10 rounded-xl items-center justify-center mr-3 ${disponible ? 'bg-success-soft' : 'bg-slate-100'}`}>
+              <IconStethoscope size={19} color={disponible ? colors.success.text : colors.slate[400]} />
+            </View>
+            <View className="flex-1 mr-2">
+              <Text className="text-[14px] font-bold text-slate-900">Disponibilidad para turnos</Text>
+              <Text className="text-[12px] text-slate-500 mt-0.5">
+                {disponible ? 'Los pacientes pueden solicitarte turnos.' : 'No aparecés disponible para nuevos turnos.'}
+              </Text>
+            </View>
+            <DisponibleSwitch checked={disponible} disabled={toggleDisponible.isPending} onPress={handleToggleDisponible} />
+          </Card>
+        </View>
+
+        {/* Mis calificaciones */}
+        <View className="px-4 mt-3.5">
+          <PressableScale haptic="select" onPress={() => router.push('/medico/calificaciones')}>
+            <Card className="p-4 flex-row items-center">
+              <View className="w-10 h-10 rounded-xl items-center justify-center mr-3" style={{ backgroundColor: '#FFFBEB' }}>
+                <IconStar size={19} color="#F59E0B" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-[14px] font-bold text-slate-900">Mis calificaciones</Text>
+                <Text className="text-[12px] text-slate-500 mt-0.5">Reseñas que te dejaron los pacientes</Text>
+              </View>
+              <IconChevronRight size={18} color={colors.slate[400]} />
+            </Card>
+          </PressableScale>
+        </View>
+
         <View className="px-4 mt-3.5">
           <Card className="p-5">
             <View className="flex-row items-center gap-2 mb-3">
@@ -92,6 +160,8 @@ export default function MedicoPerfil() {
               <Text className="text-[15px] font-bold text-slate-900">Información de la cuenta</Text>
             </View>
             <DataRow label="DNI" value={user?.dni || '—'} />
+            <DataRow label="Matrícula" value={ficha?.matricula || '—'} />
+            <DataRow label="Especialidad" value={ficha?.especialidad?.nombre || '—'} />
             <DataRow label="Teléfono" value={user?.telefono || 'No registrado'} />
             <DataRow label="Rol" value="Médico" last />
           </Card>

@@ -1,23 +1,11 @@
-import {
-  PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
-} from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { motion } from 'motion/react';
 import { useAdminStats } from '../../hooks';
 import { PageTransition } from '../../components/PageTransition';
-import { Card, PageHeader, StatCard, SkeletonStatCard, SkeletonChart, Table, THead, TH, TBody, TR, TD } from '../../ui';
-import {
-  IconChart, IconCalendar, IconClock, IconCheck, IconX, IconShield,
-} from '../../ui/icons';
-import { CHART, tooltipStyle, axisTickStyle } from '../../lib/chartTheme';
+import { TrendChart } from '../../components/TrendChart';
+import { Card, PageHeader, SkeletonChart, Table, THead, TH, TBody, TR, TD } from '../../ui';
+import { CHART, tooltipStyle } from '../../lib/chartTheme';
 import { EASE } from '../../lib/motion';
-
-const STATUS_COLORS: Record<string, string> = {
-  Pendientes:  CHART.status.PENDIENTE,
-  Confirmados: CHART.status.CONFIRMADO,
-  Completados: CHART.status.COMPLETADO,
-  Cancelados:  CHART.status.CANCELADO,
-};
 
 export default function AdminReportes() {
   const { data: stats, isLoading } = useAdminStats();
@@ -25,13 +13,13 @@ export default function AdminReportes() {
   if (isLoading) {
     return (
       <PageTransition>
-        <PageHeader title="Reportes" description="Métricas y distribución de los turnos." />
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-          {Array.from({ length: 6 }).map((_, i) => <SkeletonStatCard key={i} />)}
-        </div>
-        <div className="grid md:grid-cols-2 gap-6">
-          <SkeletonChart height={240} />
-          <SkeletonChart height={240} />
+        <PageHeader title="Reportes" description="Métricas y actividad de los turnos." />
+        <div className="space-y-6">
+          <SkeletonChart height={96} />
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-2"><SkeletonChart height={280} /></div>
+            <SkeletonChart height={280} />
+          </div>
         </div>
       </PageTransition>
     );
@@ -39,138 +27,172 @@ export default function AdminReportes() {
   if (!stats) return null;
 
   const t = stats.turnos;
+  const pct = (n: number) => (t.total ? Math.round((n / t.total) * 100) : 0);
 
-  const pieData = [
-    { name: 'Pendientes',  value: t.pendientes },
-    { name: 'Confirmados', value: t.confirmados },
-    { name: 'Completados', value: t.completados },
-    { name: 'Cancelados',  value: t.cancelados },
-  ].filter(d => d.value > 0);
-
-  const medicosBar = stats.topMedicos.map(m => ({
-    nombre: m.nombre.split(',')[0].replace('Dr. ', ''),
-    turnos: m.total,
-    especialidad: m.especialidad,
-  }));
-
-  const statItems = [
-    { label: 'Total registrados', value: t.total,       tone: 'default' as const, icon: <IconChart /> },
-    { label: 'Este mes',          value: t.mes,         tone: 'brand' as const,   icon: <IconCalendar /> },
-    { label: 'Pendientes',        value: t.pendientes,  tone: 'warning' as const, icon: <IconClock /> },
-    { label: 'Confirmados',       value: t.confirmados, tone: 'brand' as const,   icon: <IconShield /> },
-    { label: 'Completados',       value: t.completados, tone: 'success' as const, icon: <IconCheck /> },
-    { label: 'Cancelados',        value: t.cancelados,  tone: 'danger' as const,  icon: <IconX /> },
+  const kpis = [
+    { label: 'Turnos totales', value: t.total.toLocaleString('es-AR'), sub: `${t.mes} este mes`, tone: 'text-slate-900' },
+    { label: 'Compleción',     value: `${pct(t.completados)}%`, sub: `${t.completados} completados`, tone: 'text-success-text' },
+    { label: 'Cancelación',    value: `${pct(t.cancelados)}%`, sub: `${t.cancelados} cancelados`, tone: pct(t.cancelados) > 25 ? 'text-danger-text' : 'text-slate-900' },
+    { label: 'Ausentismo',     value: `${pct(t.ausentes)}%`, sub: `${t.ausentes} ausentes`, tone: pct(t.ausentes) > 15 ? 'text-warning-text' : 'text-slate-900' },
+    { label: 'Médicos activos', value: stats.medicos.disponibles, sub: `${stats.usuarios.pacientes} pacientes`, tone: 'text-slate-900' },
   ];
+
+  const estados = [
+    { name: 'Completados', value: t.completados, color: CHART.status.COMPLETADO },
+    { name: 'Confirmados', value: t.confirmados, color: CHART.status.CONFIRMADO },
+    { name: 'Pendientes',  value: t.pendientes,  color: CHART.status.PENDIENTE },
+    { name: 'Cancelados',  value: t.cancelados,  color: CHART.status.CANCELADO },
+  ].map(e => ({ ...e, pct: pct(e.value) }));
+  const pieData = estados.filter(e => e.value > 0);
+
+  const maxMedico = Math.max(...stats.topMedicos.map(m => m.total), 1);
 
   return (
     <PageTransition>
-      <PageHeader title="Reportes" description="Métricas y distribución de los turnos." />
+      <PageHeader title="Reportes" description="Métricas y actividad de los turnos." />
 
       <div className="space-y-6">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {statItems.map(s => (
-            <StatCard key={s.label} label={s.label} value={s.value} tone={s.tone} icon={s.icon} />
-          ))}
+        {/* KPIs */}
+        <Card className="p-0 overflow-hidden">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-y sm:divide-y-0 divide-slate-100">
+            {kpis.map(k => (
+              <div key={k.label} className="px-5 py-4">
+                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">{k.label}</p>
+                <p className={`text-[26px] font-bold tracking-tighter2 leading-none mt-2 tnum ${k.tone}`}>{k.value}</p>
+                <p className="text-xs text-slate-400 mt-1.5">{k.sub}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* Tendencia + estado */}
+        <div className="grid gap-6 lg:grid-cols-3">
+          <TrendChart className="lg:col-span-2" tendencia={stats.tendencia} title="Turnos creados" />
+
+          <Card className="p-5 lg:p-6">
+            <h2 className="font-semibold text-slate-900">Estado de turnos</h2>
+            <p className="text-xs text-slate-400 mt-0.5 mb-3">Distribución actual</p>
+            {pieData.length === 0 ? (
+              <p className="text-sm text-slate-400 py-8 text-center">Sin turnos registrados.</p>
+            ) : (
+              <>
+                <div className="relative">
+                  <ResponsiveContainer width="100%" height={176}>
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%" cy="50%"
+                        innerRadius={56} outerRadius={80}
+                        paddingAngle={3} dataKey="value" stroke="none"
+                        animationDuration={600}
+                      >
+                        {pieData.map(e => <Cell key={e.name} fill={e.color} />)}
+                      </Pie>
+                      <Tooltip contentStyle={tooltipStyle} formatter={(val) => [`${val} turnos`, '']} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-2xl font-bold text-slate-900 tnum leading-none">{t.total}</span>
+                    <span className="text-[11px] text-slate-400 mt-0.5">turnos</span>
+                  </div>
+                </div>
+                <ul className="mt-4 space-y-2.5">
+                  {estados.map(e => (
+                    <li key={e.name} className="flex items-center gap-2.5 text-sm">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: e.color }} />
+                      <span className="text-slate-600 flex-1">{e.name}</span>
+                      <span className="font-semibold text-slate-900 tnum">{e.value}</span>
+                      <span className="text-slate-400 w-10 text-right tnum">{e.pct}%</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </Card>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
-          <Card className="p-6">
-            <h2 className="font-semibold text-slate-900 mb-1">Distribución por estado</h2>
-            <p className="text-xs text-slate-400 mb-4">Proporción de turnos según su estado actual</p>
-            {pieData.length === 0 ? (
-              <p className="text-sm text-slate-400">Sin turnos registrados.</p>
+        {/* Top médicos + especialidades */}
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Card className="p-5 lg:p-6 lg:col-span-1">
+            <h2 className="font-semibold text-slate-900">Médicos con más turnos</h2>
+            <p className="text-xs text-slate-400 mt-0.5 mb-4">Top {stats.topMedicos.length} por volumen</p>
+            {stats.topMedicos.length === 0 ? (
+              <p className="text-sm text-slate-400">Sin datos todavía.</p>
             ) : (
-              <ResponsiveContainer width="100%" height={240}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%" cy="50%"
-                    innerRadius={62} outerRadius={92}
-                    paddingAngle={3}
-                    dataKey="value"
-                    stroke="none"
-                    animationDuration={600}
-                  >
-                    {pieData.map(entry => (
-                      <Cell key={entry.name} fill={STATUS_COLORS[entry.name] ?? CHART.axis} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={tooltipStyle} formatter={(val) => [`${val} turnos`, '']} />
-                  <Legend
-                    iconType="circle"
-                    iconSize={8}
-                    formatter={v => <span style={{ fontSize: 12, color: '#64748B' }}>{v}</span>}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              <div className="space-y-4">
+                {stats.topMedicos.map((m, i) => (
+                  <div key={`${m.nombre}-${i}`}>
+                    <div className="flex items-center justify-between gap-3 text-sm mb-1.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="w-5 h-5 rounded-md bg-slate-100 text-slate-500 grid place-items-center text-[11px] font-bold shrink-0 tnum">
+                          {i + 1}
+                        </span>
+                        <span className="font-medium text-slate-800 truncate">{m.nombre.replace('Dr. ', '')}</span>
+                        <span className="text-xs text-slate-400 truncate hidden sm:inline">{m.especialidad}</span>
+                      </div>
+                      <span className="font-semibold text-slate-900 tnum whitespace-nowrap">{m.total}</span>
+                    </div>
+                    <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ scaleX: 0 }}
+                        animate={{ scaleX: m.total / maxMedico }}
+                        transition={{ duration: 0.6, ease: EASE.outExpo, delay: i * 0.05 }}
+                        className="h-full w-full rounded-full bg-brand-600 origin-left"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </Card>
 
-          {medicosBar.length > 0 && (
-            <Card className="p-6">
-              <h2 className="font-semibold text-slate-900 mb-1">Médicos con más turnos</h2>
-              <p className="text-xs text-slate-400 mb-5">Cantidad de turnos asignados por médico</p>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={medicosBar} margin={{ top: 0, right: 20, left: -15, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
-                  <XAxis dataKey="nombre" tick={{ fill: '#475569', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={axisTickStyle} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    contentStyle={tooltipStyle}
-                    cursor={{ fill: 'rgb(13 148 136 / 0.06)' }}
-                    formatter={(val) => [`${val} turnos`, 'Turnos']}
-                  />
-                  <Bar dataKey="turnos" fill={CHART.brand} radius={[6, 6, 0, 0]} maxBarSize={48} animationDuration={600} />
-                </BarChart>
-              </ResponsiveContainer>
-            </Card>
-          )}
-        </div>
-
-        {stats.porEspecialidad.length > 0 && (
-          <Card className="overflow-hidden">
+          <Card className="overflow-hidden lg:col-span-2">
             <div className="px-6 pt-5 pb-1">
-              <h2 className="font-semibold text-slate-900 mb-1">Por especialidad</h2>
-              <p className="text-xs text-slate-400">Médicos y turnos agrupados por especialidad</p>
+              <h2 className="font-semibold text-slate-900">Por especialidad</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Médicos y turnos agrupados por especialidad</p>
             </div>
-            <div className="pt-3">
-              <Table>
-                <THead>
-                  <TH className="pl-6">Especialidad</TH>
-                  <TH align="right">Médicos</TH>
-                  <TH align="right">Turnos</TH>
-                  <TH className="pr-6">Participación</TH>
-                </THead>
-                <TBody>
-                  {stats.porEspecialidad.map((e, i) => {
-                    const max = Math.max(...stats.porEspecialidad.map(x => x.turnos), 1);
-                    const pct = Math.round((e.turnos / max) * 100);
-                    return (
-                      <TR key={e.nombre}>
-                        <TD className="pl-6 font-medium text-slate-900">{e.nombre}</TD>
-                        <TD numeric>{e.medicos}</TD>
-                        <TD numeric className="font-semibold text-slate-900">{e.turnos}</TD>
-                        <TD className="w-44 pr-6">
-                          <div className="flex items-center gap-2.5">
-                            <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                              <motion.div
-                                initial={{ scaleX: 0 }}
-                                animate={{ scaleX: pct / 100 }}
-                                transition={{ duration: 0.6, ease: EASE.outExpo, delay: i * 0.05 }}
-                                className="h-full w-full rounded-full bg-brand-600 origin-left"
-                              />
+            {stats.porEspecialidad.length === 0 ? (
+              <p className="text-sm text-slate-400 px-6 py-8">Sin especialidades cargadas.</p>
+            ) : (
+              <div className="pt-3">
+                <Table>
+                  <THead>
+                    <TH className="pl-6">Especialidad</TH>
+                    <TH align="right">Médicos</TH>
+                    <TH align="right">Turnos</TH>
+                    <TH className="pr-6">Participación</TH>
+                  </THead>
+                  <TBody>
+                    {[...stats.porEspecialidad].sort((a, b) => b.turnos - a.turnos).map((e, i, arr) => {
+                      const max = Math.max(...arr.map(x => x.turnos), 1);
+                      const part = Math.round((e.turnos / max) * 100);
+                      return (
+                        <TR key={e.nombre}>
+                          <TD className="pl-6 font-medium text-slate-900">{e.nombre}</TD>
+                          <TD numeric>{e.medicos}</TD>
+                          <TD numeric className="font-semibold text-slate-900">{e.turnos}</TD>
+                          <TD className="w-44 pr-6">
+                            <div className="flex items-center gap-2.5">
+                              <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <motion.div
+                                  initial={{ scaleX: 0 }}
+                                  animate={{ scaleX: part / 100 }}
+                                  transition={{ duration: 0.6, ease: EASE.outExpo, delay: i * 0.05 }}
+                                  className="h-full w-full rounded-full bg-brand-600 origin-left"
+                                />
+                              </div>
+                              <span className="text-xs text-slate-400 w-9 text-right tnum">{part}%</span>
                             </div>
-                            <span className="text-xs text-slate-400 w-9 text-right tnum">{pct}%</span>
-                          </div>
-                        </TD>
-                      </TR>
-                    );
-                  })}
-                </TBody>
-              </Table>
-            </div>
+                          </TD>
+                        </TR>
+                      );
+                    })}
+                  </TBody>
+                </Table>
+              </div>
+            )}
           </Card>
-        )}
+        </div>
       </div>
     </PageTransition>
   );

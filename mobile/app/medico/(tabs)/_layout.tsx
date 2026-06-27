@@ -5,12 +5,14 @@ import { MaterialTopTabs } from '../../../components/MaterialTopTabs';
 import { PressableScale } from '../../../lib/motion';
 import { cn } from '../../../lib/cn';
 import { colors, shadow } from '../../../lib/theme';
-import { IconCalendar, IconPill, IconUser } from '../../../components/ui';
+import { IconHome, IconCalendar, IconUsers, IconPill, IconUser } from '../../../components/ui';
 
 const TABS = [
-  { name: 'agenda',  Icon: IconCalendar, label: 'Agenda' },
-  { name: 'recetas', Icon: IconPill,     label: 'Recetas' },
-  { name: 'perfil',  Icon: IconUser,     label: 'Perfil' },
+  { name: 'inicio',    Icon: IconHome,     label: 'Inicio' },
+  { name: 'agenda',    Icon: IconCalendar, label: 'Agenda' },
+  { name: 'pacientes', Icon: IconUsers,    label: 'Pacientes' },
+  { name: 'recetas',   Icon: IconPill,     label: 'Recetas' },
+  { name: 'perfil',    Icon: IconUser,     label: 'Perfil' },
 ];
 
 function MedicoTabBar({ state, navigation }: MaterialTopTabBarProps) {
@@ -46,7 +48,9 @@ export default function MedicoTabsLayout() {
       tabBarPosition="bottom"
       screenOptions={{ swipeEnabled: true }}
     >
+      <MaterialTopTabs.Screen name="inicio" />
       <MaterialTopTabs.Screen name="agenda" />
+      <MaterialTopTabs.Screen name="pacientes" />
       <MaterialTopTabs.Screen name="recetas" />
       <MaterialTopTabs.Screen name="perfil" />
     </MaterialTopTabs>

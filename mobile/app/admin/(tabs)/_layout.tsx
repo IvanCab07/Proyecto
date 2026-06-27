@@ -5,11 +5,10 @@ import { MaterialTopTabs } from '../../../components/MaterialTopTabs';
 import { PressableScale } from '../../../lib/motion';
 import { cn } from '../../../lib/cn';
 import { colors, shadow } from '../../../lib/theme';
-import { IconGrid, IconUsers, IconStethoscope, IconChart, IconSettings } from '../../../components/ui';
+import { IconGrid, IconStethoscope, IconChart, IconSettings } from '../../../components/ui';
 
 const TABS = [
   { name: 'dashboard', Icon: IconGrid,        label: 'Panel' },
-  { name: 'pacientes', Icon: IconUsers,       label: 'Pacientes' },
   { name: 'medicos',   Icon: IconStethoscope, label: 'Médicos' },
   { name: 'reportes',  Icon: IconChart,       label: 'Reportes' },
   { name: 'ajustes',   Icon: IconSettings,    label: 'Ajustes' },
@@ -49,7 +48,6 @@ export default function AdminTabsLayout() {
       screenOptions={{ swipeEnabled: true }}
     >
       <MaterialTopTabs.Screen name="dashboard" />
-      <MaterialTopTabs.Screen name="pacientes" />
       <MaterialTopTabs.Screen name="medicos" />
       <MaterialTopTabs.Screen name="reportes" />
       <MaterialTopTabs.Screen name="ajustes" />

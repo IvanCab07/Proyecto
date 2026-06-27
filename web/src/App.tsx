@@ -15,9 +15,6 @@ import VerifyEmail from './pages/auth/VerifyEmail';
 import VerifyOTP from './pages/auth/VerifyOTP';
 
 import AdminDashboard from './pages/admin/Dashboard';
-import AdminAgenda from './pages/admin/Agenda';
-import AdminTurnos from './pages/admin/Turnos';
-import AdminPacientes from './pages/admin/Pacientes';
 import AdminMedicos from './pages/admin/Medicos';
 import AdminEspecialidades from './pages/admin/Especialidades';
 import AdminUsuarios from './pages/admin/Usuarios';
@@ -25,8 +22,11 @@ import AdminCalificaciones from './pages/admin/Calificaciones';
 import AdminReportes from './pages/admin/Reportes';
 import AdminAjustes from './pages/admin/Ajustes';
 
+import MedicoInicio from './pages/medico/Inicio';
 import MedicoAgenda from './pages/medico/Agenda';
+import MedicoPacientes from './pages/medico/Pacientes';
 import MedicoRecetas from './pages/medico/Recetas';
+import MedicoCalificaciones from './pages/medico/Calificaciones';
 import MedicoPerfil from './pages/medico/Perfil';
 
 import PacienteInicio from './pages/paciente/Inicio';
@@ -66,9 +66,6 @@ function AppRouter() {
       <Route path="/verify-otp"      element={<VerifyOTP />} />
 
       <Route path="/admin/dashboard"      element={<ProtectedRoute role="ADMIN"><AdminDashboard /></ProtectedRoute>} />
-      <Route path="/admin/agenda"         element={<ProtectedRoute role="ADMIN"><AdminAgenda /></ProtectedRoute>} />
-      <Route path="/admin/turnos"         element={<ProtectedRoute role="ADMIN"><AdminTurnos /></ProtectedRoute>} />
-      <Route path="/admin/pacientes"      element={<ProtectedRoute role="ADMIN"><AdminPacientes /></ProtectedRoute>} />
       <Route path="/admin/medicos"        element={<ProtectedRoute role="ADMIN"><AdminMedicos /></ProtectedRoute>} />
       <Route path="/admin/especialidades" element={<ProtectedRoute role="ADMIN"><AdminEspecialidades /></ProtectedRoute>} />
       <Route path="/admin/usuarios"       element={<ProtectedRoute role="ADMIN"><AdminUsuarios /></ProtectedRoute>} />
@@ -76,9 +73,12 @@ function AppRouter() {
       <Route path="/admin/reportes"       element={<ProtectedRoute role="ADMIN"><AdminReportes /></ProtectedRoute>} />
       <Route path="/admin/ajustes"        element={<ProtectedRoute role="ADMIN"><AdminAjustes /></ProtectedRoute>} />
 
-      <Route path="/medico/agenda"  element={<ProtectedRoute role="MEDICO"><MedicoAgenda /></ProtectedRoute>} />
-      <Route path="/medico/recetas" element={<ProtectedRoute role="MEDICO"><MedicoRecetas /></ProtectedRoute>} />
-      <Route path="/medico/perfil"  element={<ProtectedRoute role="MEDICO"><MedicoPerfil /></ProtectedRoute>} />
+      <Route path="/medico/inicio"        element={<ProtectedRoute role="MEDICO"><MedicoInicio /></ProtectedRoute>} />
+      <Route path="/medico/agenda"        element={<ProtectedRoute role="MEDICO"><MedicoAgenda /></ProtectedRoute>} />
+      <Route path="/medico/pacientes"     element={<ProtectedRoute role="MEDICO"><MedicoPacientes /></ProtectedRoute>} />
+      <Route path="/medico/recetas"       element={<ProtectedRoute role="MEDICO"><MedicoRecetas /></ProtectedRoute>} />
+      <Route path="/medico/calificaciones" element={<ProtectedRoute role="MEDICO"><MedicoCalificaciones /></ProtectedRoute>} />
+      <Route path="/medico/perfil"        element={<ProtectedRoute role="MEDICO"><MedicoPerfil /></ProtectedRoute>} />
 
       <Route path="/paciente/inicio"    element={<ProtectedRoute role="PATIENT"><PacienteInicio /></ProtectedRoute>} />
       <Route path="/paciente/turnos"    element={<ProtectedRoute role="PATIENT"><PacienteTurnos /></ProtectedRoute>} />

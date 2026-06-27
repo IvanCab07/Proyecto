@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
-import { formatZodError } from '../lib/httpError';
+import { HttpError, formatZodError } from '../lib/httpError';
 
 const medicoSchema = z.object({
   nombre:        z.string().min(2),
@@ -14,6 +14,10 @@ const actualizarMedicoSchema = z.object({
   nombre:     z.string().min(2).optional(),
   apellido:   z.string().min(2).optional(),
   disponible: z.boolean().optional(),
+});
+
+const miDisponibilidadSchema = z.object({
+  disponible: z.boolean(),
 });
 
 // Pacientes y admins: médicos disponibles
@@ -85,6 +89,35 @@ export const actualizarMedico = async (req: Request, res: Response) => {
   });
 
   return res.json(medico);
+};
+
+// Médico: su propia ficha (matrícula, especialidad, disponibilidad)
+export const getMiFichaMedico = async (req: Request, res: Response) => {
+  const medico = await prisma.medico.findUnique({
+    where: { userId: req.user!.userId },
+    include: { especialidad: true },
+  });
+  if (!medico) throw new HttpError(403, 'Tu cuenta no está vinculada a una ficha de médico');
+  return res.json(medico);
+};
+
+// Médico: cambiar su propia disponibilidad
+export const actualizarMiDisponibilidad = async (req: Request, res: Response) => {
+  const result = miDisponibilidadSchema.safeParse(req.body);
+  if (!result.success) {
+    return res.status(400).json({ error: formatZodError(result.error) });
+  }
+
+  const medico = await prisma.medico.findUnique({ where: { userId: req.user!.userId } });
+  if (!medico) throw new HttpError(403, 'Tu cuenta no está vinculada a una ficha de médico');
+
+  const actualizado = await prisma.medico.update({
+    where: { id: medico.id },
+    data: { disponible: result.data.disponible },
+    include: { especialidad: true },
+  });
+
+  return res.json(actualizado);
 };
 
 // Horarios ocupados de un médico en una fecha (para elegir turno)

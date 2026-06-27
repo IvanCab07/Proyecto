@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { verifyToken, requireAdmin } from '../middlewares/auth.middleware';
+import { verifyToken, requireAdmin, requireMedico } from '../middlewares/auth.middleware';
 import { asyncHandler } from '../lib/asyncHandler';
 import {
   getMedicosDisponibles,
@@ -9,10 +9,16 @@ import {
   actualizarMedico,
   getDisponibilidad,
   eliminarMedico,
+  getMiFichaMedico,
+  actualizarMiDisponibilidad,
 } from '../controllers/medicos.controller';
 
 const router = Router();
 router.use(verifyToken);
+
+// Médico: su propia ficha y disponibilidad (van antes de '/:id' para no chocar)
+router.get('/mi-ficha',            requireMedico, asyncHandler(getMiFichaMedico));
+router.patch('/mi-disponibilidad', requireMedico, asyncHandler(actualizarMiDisponibilidad));
 
 // Pacientes y admins
 router.get('/',                              asyncHandler(getMedicosDisponibles));

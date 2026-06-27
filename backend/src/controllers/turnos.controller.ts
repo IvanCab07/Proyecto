@@ -321,18 +321,56 @@ export const getStats = async (_req: Request, res: Response) => {
   const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
   const finMes    = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59);
 
-  const [total, pendientes, confirmados, completados, cancelados, turnosHoy, turnosMes, totalPacientes, medicosDisp] =
+  const [total, pendientes, confirmados, completados, cancelados, ausentes, turnosHoy, turnosMes, totalPacientes, medicosDisp] =
     await Promise.all([
       prisma.turno.count(),
       prisma.turno.count({ where: { status: 'PENDIENTE' } }),
       prisma.turno.count({ where: { status: 'CONFIRMADO' } }),
       prisma.turno.count({ where: { status: 'COMPLETADO' } }),
       prisma.turno.count({ where: { status: 'CANCELADO' } }),
+      prisma.turno.count({ where: { status: 'AUSENTE' } }),
       prisma.turno.count({ where: { fecha: { gte: inicioHoy, lte: finHoy } } }),
       prisma.turno.count({ where: { fecha: { gte: inicioMes, lte: finMes } } }),
       prisma.user.count({ where: { role: 'PATIENT' } }),
       prisma.medico.count({ where: { disponible: true } }),
     ]);
+
+  // ── Tendencia real (sin datos inventados): se cuentan los turnos por día y por mes
+  // a partir de su fecha, mirando los últimos 6 meses una sola vez.
+  const desde6Meses = new Date(ahora.getFullYear(), ahora.getMonth() - 5, 1);
+  const turnosRango = await prisma.turno.findMany({
+    where: { fecha: { gte: desde6Meses } },
+    select: { fecha: true },
+  });
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const MESES_ABR = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+  // Conteos por día (clave YYYY-MM-DD) y por mes (clave YYYY-MM)
+  const porDiaMap = new Map<string, number>();
+  const porMesMap = new Map<string, number>();
+  for (const { fecha } of turnosRango) {
+    const f = new Date(fecha);
+    const diaKey = `${f.getFullYear()}-${pad(f.getMonth() + 1)}-${pad(f.getDate())}`;
+    const mesKey = `${f.getFullYear()}-${pad(f.getMonth() + 1)}`;
+    porDiaMap.set(diaKey, (porDiaMap.get(diaKey) ?? 0) + 1);
+    porMesMap.set(mesKey, (porMesMap.get(mesKey) ?? 0) + 1);
+  }
+
+  // Últimos 14 días (incluye los días sin turnos en 0 para que la curva no tenga huecos)
+  const dias = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(ahora);
+    d.setDate(d.getDate() - (13 - i));
+    const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    return { fecha: key, label: `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`, total: porDiaMap.get(key) ?? 0 };
+  });
+
+  // Últimos 6 meses
+  const meses = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(ahora.getFullYear(), ahora.getMonth() - (5 - i), 1);
+    const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+    return { mes: key, label: MESES_ABR[d.getMonth()], total: porMesMap.get(key) ?? 0 };
+  });
 
   const topMedicos = await prisma.medico.findMany({
     include: { especialidad: true, _count: { select: { turnos: true } } },
@@ -348,7 +386,8 @@ export const getStats = async (_req: Request, res: Response) => {
   });
 
   return res.json({
-    turnos: { total, pendientes, confirmados, completados, cancelados, hoy: turnosHoy, mes: turnosMes },
+    turnos: { total, pendientes, confirmados, completados, cancelados, ausentes, hoy: turnosHoy, mes: turnosMes },
+    tendencia: { dias, meses },
     usuarios: { pacientes: totalPacientes },
     medicos: { disponibles: medicosDisp },
     topMedicos: topMedicos.map(m => ({

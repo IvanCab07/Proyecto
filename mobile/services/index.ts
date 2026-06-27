@@ -210,6 +210,8 @@ export interface UpdateUsuarioDTO {
   puedeCalificar?: boolean;
 }
 
+export interface TrendPoint { fecha?: string; mes?: string; label: string; total: number; }
+
 export interface AdminStats {
   turnos: {
     total: number;
@@ -217,9 +219,11 @@ export interface AdminStats {
     confirmados: number;
     completados: number;
     cancelados: number;
+    ausentes: number;
     hoy: number;
     mes: number;
   };
+  tendencia: { dias: TrendPoint[]; meses: TrendPoint[] };
   usuarios: { pacientes: number };
   medicos: { disponibles: number };
   topMedicos: { nombre: string; especialidad: string; total: number }[];
@@ -325,6 +329,13 @@ export const medicosService = {
 
   eliminar: (id: string) =>
     api.delete(`/medicos/${id}`),
+
+  // Médico: su propia ficha y disponibilidad
+  miFicha: () =>
+    api.get<Medico>('/medicos/mi-ficha').then(r => r.data),
+
+  actualizarMiDisponibilidad: (disponible: boolean) =>
+    api.patch<Medico>('/medicos/mi-disponibilidad', { disponible }).then(r => r.data),
 };
 
 export const estudiosService = {

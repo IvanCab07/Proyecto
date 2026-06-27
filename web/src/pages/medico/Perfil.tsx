@@ -6,13 +6,14 @@ import { apiError } from '../../lib/apiError';
 import { useAuthStore } from '../../store/useAuthStore';
 import {
   useActualizarPerfil, useCambiarPassword, useMiAgenda, useRecetasMedico,
+  useMiFichaMedico, useActualizarMiDisponibilidad,
 } from '../../hooks';
 import { PageTransition } from '../../components/PageTransition';
 import { SeguridadCard } from '../../components/SeguridadCard';
 import { Card, Button, Dialog, Input, PasswordInput, PageHeader, StatCard } from '../../ui';
 import {
   IconEdit, IconKey, IconAlert, IconIdCard, IconPhone, IconShield,
-  IconCalendar, IconCheckCircle, IconPill, IconArrowRight,
+  IconCalendar, IconCheckCircle, IconPill, IconArrowRight, IconStethoscope,
 } from '../../ui/icons';
 import { iniciales } from '../../lib/format';
 
@@ -21,12 +22,40 @@ const ACCESOS = [
   { label: 'Recetas',   desc: 'Emití y consultá',      icon: <IconPill />, to: '/medico/recetas' },
 ];
 
+function DisponibleSwitch({ checked, onChange, disabled }: { checked: boolean; onChange: () => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={checked ? 'Marcarme como no disponible' : 'Marcarme como disponible'}
+      disabled={disabled}
+      onClick={onChange}
+      className={`w-11 h-6 rounded-pill p-0.5 flex items-center transition-colors duration-200 disabled:opacity-50 ${checked ? 'bg-success justify-end' : 'bg-slate-300 justify-start'}`}
+    >
+      <span className="w-5 h-5 rounded-full bg-white shadow-xs" />
+    </button>
+  );
+}
+
 export default function MedicoPerfil() {
   const { user } = useAuthStore();
   const actualizarPerfil = useActualizarPerfil();
   const cambiarPassword = useCambiarPassword();
   const { data: agenda } = useMiAgenda();
   const { data: recetas } = useRecetasMedico();
+  const { data: ficha } = useMiFichaMedico();
+  const toggleDisponible = useActualizarMiDisponibilidad();
+
+  const disponible = ficha?.disponible ?? false;
+  const handleToggleDisponible = async () => {
+    try {
+      await toggleDisponible.mutateAsync(!disponible);
+      toast.success(!disponible ? 'Quedaste disponible para nuevos turnos' : 'Te marcaste como no disponible');
+    } catch {
+      toast.error('No se pudo actualizar la disponibilidad');
+    }
+  };
 
   const [modalPerfil, setModalPerfil] = useState(false);
   const [modalPwd, setModalPwd] = useState(false);
@@ -80,6 +109,8 @@ export default function MedicoPerfil() {
 
   const rows = [
     { label: 'DNI', value: user?.dni || '—', icon: <IconIdCard /> },
+    { label: 'Matrícula', value: ficha?.matricula || '—', icon: <IconIdCard /> },
+    { label: 'Especialidad', value: ficha?.especialidad?.nombre || '—', icon: <IconStethoscope /> },
     { label: 'Teléfono', value: user?.telefono || 'No registrado', icon: <IconPhone /> },
     { label: 'Rol', value: 'Médico', icon: <IconShield /> },
   ];
@@ -129,6 +160,24 @@ export default function MedicoPerfil() {
           <StatCard label="Completados" value={completados} icon={<IconCheckCircle />} tone="success" />
           <StatCard label="Recetas emitidas" value={recetas?.length ?? 0} icon={<IconPill />} tone="accent" />
         </div>
+
+        {/* Disponibilidad */}
+        <Card className="lg:col-span-2 p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className={`w-10 h-10 rounded-xl grid place-items-center shrink-0 [&>svg]:w-5 [&>svg]:h-5 ${disponible ? 'bg-success-soft text-success-text' : 'bg-slate-100 text-slate-400'}`}>
+                <IconStethoscope />
+              </span>
+              <div className="min-w-0">
+                <p className="font-semibold text-slate-900 text-sm">Disponibilidad para turnos</p>
+                <p className="text-[13px] text-slate-500">
+                  {disponible ? 'Los pacientes pueden solicitarte turnos.' : 'No aparecés disponible para nuevos turnos.'}
+                </p>
+              </div>
+            </div>
+            <DisponibleSwitch checked={disponible} disabled={toggleDisponible.isPending} onChange={handleToggleDisponible} />
+          </div>
+        </Card>
 
         {/* Accesos rápidos */}
         <Card className="lg:col-span-2 p-5">

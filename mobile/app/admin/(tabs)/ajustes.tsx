@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, Platform } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../../hooks/useAuthStore';
 import { useActualizarPerfil, useCambiarPassword } from '../../../hooks';
-import { getApiUrl, pingHealth } from '../../../services/api';
 import {
-  Card, Avatar, Button, Input, PasswordInput, Sheet, Spinner, ScreenHeader, confirm, toast,
-  IconUser, IconEdit, IconLock, IconLogout, IconServer, IconWifi, IconCheckCircle, IconAlertCircle, IconActivity,
+  Card, Avatar, Button, Input, PasswordInput, Sheet, ScreenHeader, confirm, toast,
+  IconUser, IconEdit, IconLock, IconLogout,
   IconUsers, IconTag, IconShield, IconChevronRight, IconStar,
 } from '../../../components/ui';
 import { SeguridadSection } from '../../../components/SeguridadSection';
@@ -15,8 +14,6 @@ import { colors } from '../../../lib/theme';
 import { apiError } from '../../../lib/apiError';
 
 type ActiveModal = 'perfil' | 'password' | null;
-type PingState = { ok: boolean; url: string; error?: string } | null;
-const MONO = Platform.OS === 'ios' ? 'Courier' : 'monospace';
 
 export default function AjustesScreen() {
   const { user, logout } = useAuthStore();
@@ -25,12 +22,8 @@ export default function AjustesScreen() {
   const cambiarPassword = useCambiarPassword();
 
   const [modal, setModal] = useState<ActiveModal>(null);
-  const [pinging, setPinging] = useState(false);
-  const [pingResult, setPingResult] = useState<PingState>(null);
   const [perfilForm, setPerfilForm] = useState({ nombre: user?.nombre ?? '', apellido: user?.apellido ?? '', telefono: user?.telefono ?? '' });
   const [pwdForm, setPwdForm] = useState({ passwordActual: '', passwordNueva: '', confirm: '' });
-
-  const handlePing = async () => { setPinging(true); setPingResult(null); const r = await pingHealth(); setPingResult(r); setPinging(false); };
 
   const handleLogout = async () => {
     const ok = await confirm({ title: 'Cerrar sesión', message: '¿Querés salir de tu cuenta?', confirmText: 'Salir', destructive: true });
@@ -95,36 +88,6 @@ export default function AjustesScreen() {
             <NavRow icon={<IconUsers size={16} color={colors.brand[600]} />} label="Usuarios y cuentas" desc="Crear, editar y dar de baja" onPress={() => router.push('/admin/usuarios')} />
             <NavRow icon={<IconTag size={16} color={colors.brand[600]} />} label="Especialidades" desc="Catálogo médico" onPress={() => router.push('/admin/especialidades')} />
             <NavRow icon={<IconStar size={16} color={colors.brand[600]} />} label="Calificaciones" desc="Reseñas y promedio por médico" onPress={() => router.push('/admin/calificaciones')} last />
-          </Card>
-        </View>
-
-        <View className="px-4 mt-3.5">
-          <Card className="p-5">
-            <SectionHead icon={<IconActivity size={15} color={colors.brand[600]} />} title="Sistema" />
-            <DataRow label="Versión" value="1.0.0" />
-            <DataRow label="Plataforma" value="React Native + Expo SDK 54" last />
-          </Card>
-        </View>
-
-        <View className="px-4 mt-3.5">
-          <Card className="p-5">
-            <SectionHead icon={<IconWifi size={15} color={colors.brand[600]} />} title="Diagnóstico de conexión" />
-            <View className="bg-slate-50 rounded-lg p-3 mb-3">
-              <Text className="text-[11px] text-slate-500 font-semibold mb-0.5">URL del servidor en uso</Text>
-              <Text className="text-[12px] text-slate-900" style={{ fontFamily: MONO }}>{getApiUrl()}</Text>
-            </View>
-            <Button fullWidth loading={pinging} onPress={handlePing} iconLeft={<IconWifi size={16} color="#fff" />} className="mb-3">Probar conexión</Button>
-            {pingResult ? (
-              <View className="rounded-lg p-3 mb-3" style={{ backgroundColor: pingResult.ok ? colors.success.soft : colors.danger.soft }}>
-                <View className="flex-row items-center gap-2">
-                  {pingResult.ok ? <IconCheckCircle size={16} color={colors.success.text} /> : <IconAlertCircle size={16} color={colors.danger.text} />}
-                  <Text className="font-bold text-sm" style={{ color: pingResult.ok ? colors.success.text : colors.danger.text }}>{pingResult.ok ? 'OK — Servidor alcanzable' : 'FALLA — No se pudo conectar'}</Text>
-                </View>
-                <Text className="text-[12px] mt-1" style={{ color: pingResult.ok ? colors.success.text : colors.danger.text, fontFamily: MONO }}>{pingResult.url}</Text>
-                {pingResult.error ? <Text className="text-[11px] mt-1" style={{ color: colors.danger.text }}>{pingResult.error}</Text> : null}
-              </View>
-            ) : null}
-            <Button variant="secondary" fullWidth onPress={() => router.push('/server-config')} iconLeft={<IconServer size={16} color={colors.slate[600]} />}>Configurar servidor</Button>
           </Card>
         </View>
 

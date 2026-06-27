@@ -191,7 +191,7 @@ function AdminCommand() {
     }));
     const pac = (pacientes ?? []).map<CmdItem>(p => ({
       id: `pac-${p.id}`, label: `${p.nombre} ${p.apellido}`, hint: `DNI ${p.dni}`,
-      group: 'Pacientes', icon: <IconUser />, to: '/admin/pacientes', searchOnly: true,
+      group: 'Pacientes', icon: <IconUser />, to: '/admin/usuarios', searchOnly: true,
     }));
     const med = (medicos ?? []).map<CmdItem>(m => ({
       id: `med-${m.id}`, label: `Dr. ${m.nombre} ${m.apellido}`, hint: m.especialidad.nombre,

@@ -30,7 +30,7 @@ export default function LoginScreen() {
       const { user } = useAuthStore.getState();
       router.replace(
         user?.role === 'ADMIN' ? '/admin/dashboard'
-          : user?.role === 'MEDICO' ? '/medico/agenda'
+          : user?.role === 'MEDICO' ? '/medico/inicio'
             : '/patient/inicio',
       );
     } catch (err) {
@@ -80,6 +80,10 @@ export default function LoginScreen() {
               <Text className="text-slate-400 text-sm">¿No tenés cuenta?  </Text>
               <Link href="/auth/register"><Text className="text-brand-700 font-bold text-sm">Registrate</Text></Link>
             </View>
+
+            <Link href="/server-config" asChild>
+              <Text className="text-slate-400 text-[13px] text-center mt-5">Configurar servidor</Text>
+            </Link>
           </Animated.View>
       </KeyboardAwareScrollView>
     </View>

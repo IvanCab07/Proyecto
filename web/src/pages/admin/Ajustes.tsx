@@ -3,7 +3,6 @@ import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { apiError } from '../../lib/apiError';
-import { api, apiUrl } from '../../services/api';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useActualizarPerfil, useCambiarPassword } from '../../hooks';
 import { PageTransition } from '../../components/PageTransition';
@@ -11,7 +10,7 @@ import { SeguridadCard } from '../../components/SeguridadCard';
 import { Card, Button, Dialog, Input, PasswordInput, PageHeader } from '../../ui';
 import {
   IconEdit, IconKey, IconAlert, IconIdCard, IconPhone, IconShield, IconLogout,
-  IconActivity, IconCheckCircle, IconUsers, IconStethoscope, IconTag, IconChart, IconChevronRight,
+  IconUsers, IconStethoscope, IconTag, IconChart, IconChevronRight,
 } from '../../ui/icons';
 import { iniciales } from '../../lib/format';
 
@@ -34,7 +33,6 @@ export default function AdminAjustes() {
   const [pwdForm, setPwdForm] = useState({ passwordActual: '', passwordNueva: '', confirm: '' });
   const [perfilError, setPerfilError] = useState('');
   const [pwdError, setPwdError] = useState('');
-  const [conn, setConn] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle');
 
   const abrirPerfil = () => {
     setPerfilForm({ nombre: user?.nombre ?? '', apellido: user?.apellido ?? '', telefono: user?.telefono ?? '' });
@@ -75,12 +73,6 @@ export default function AdminAjustes() {
 
   const handleLogout = () => { logout(); navigate('/login', { replace: true }); };
 
-  const probarConexion = async () => {
-    setConn('testing');
-    try { await api.get('/health'); setConn('ok'); }
-    catch { setConn('fail'); }
-  };
-
   const rows = [
     { label: 'DNI', value: user?.dni || '—', icon: <IconIdCard /> },
     { label: 'Teléfono', value: user?.telefono || 'No registrado', icon: <IconPhone /> },
@@ -89,7 +81,7 @@ export default function AdminAjustes() {
 
   return (
     <PageTransition>
-      <PageHeader title="Ajustes" description="Tu cuenta y la configuración del sistema." />
+      <PageHeader title="Ajustes" description="Tu cuenta y seguridad." />
 
       <div className="grid gap-4 lg:grid-cols-3 items-start">
         {/* Cuenta */}
@@ -135,30 +127,6 @@ export default function AdminAjustes() {
         <div className="lg:col-span-2">
           <SeguridadCard />
         </div>
-
-        {/* Sistema / Conexión */}
-        <Card className="p-5 lg:col-span-2">
-          <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><IconActivity className="w-4 h-4 text-slate-400" /> Sistema y conexión</h3>
-          <div className="space-y-3 text-sm">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-slate-500">Versión</span>
-              <span className="text-slate-900 font-medium">1.0.0</span>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-slate-500">Entorno</span>
-              <span className="text-slate-900 font-medium">{import.meta.env.MODE}</span>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-slate-500 shrink-0">Servidor (API)</span>
-              <span className="text-slate-900 font-medium font-mono text-xs truncate">{apiUrl}</span>
-            </div>
-            <div className="flex items-center gap-3 pt-1">
-              <Button variant="secondary" size="sm" loading={conn === 'testing'} onClick={probarConexion}>Probar conexión</Button>
-              {conn === 'ok' && <span className="inline-flex items-center gap-1.5 text-success-text text-sm font-medium"><IconCheckCircle className="w-4 h-4" /> Servidor alcanzable</span>}
-              {conn === 'fail' && <span className="inline-flex items-center gap-1.5 text-danger-text text-sm font-medium"><IconAlert className="w-4 h-4" /> Sin conexión</span>}
-            </div>
-          </div>
-        </Card>
 
         {/* Accesos rápidos */}
         <Card className="p-5 lg:col-span-3">

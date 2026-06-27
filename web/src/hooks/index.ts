@@ -257,6 +257,17 @@ export const useMiAgenda = () =>
 export const useRecetasMedico = () =>
   useQuery({ queryKey: ['recetas-medico'], queryFn: recetasService.delMedico });
 
+export const useMiFichaMedico = () =>
+  useQuery({ queryKey: ['mi-ficha-medico'], queryFn: medicosService.miFicha });
+
+export const useActualizarMiDisponibilidad = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (disponible: boolean) => medicosService.actualizarMiDisponibilidad(disponible),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['mi-ficha-medico'] }),
+  });
+};
+
 // ── Calificaciones ──
 export const useCrearCalificacion = () => {
   const qc = useQueryClient();

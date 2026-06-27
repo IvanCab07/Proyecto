@@ -29,6 +29,12 @@ export function Dialog({ open, onClose, title, description, size = 'md', footer,
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
 
+  // onClose suele venir como función nueva en cada render (onClose={() => setX(null)}).
+  // Lo guardamos en un ref para que el efecto de abajo dependa solo de `open` y no se
+  // re-ejecute en cada tecla robándole el foco a los inputs del modal.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     if (!open) return;
 
@@ -39,7 +45,7 @@ export function Dialog({ open, onClose, title, description, size = 'md', footer,
     document.body.style.overflow = 'hidden';
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     };
     document.addEventListener('keydown', onKeyDown);
 
@@ -48,7 +54,7 @@ export function Dialog({ open, onClose, title, description, size = 'md', footer,
       document.removeEventListener('keydown', onKeyDown);
       restoreFocusRef.current?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   return createPortal(
     <AnimatePresence>
