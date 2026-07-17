@@ -12,6 +12,7 @@ import { navFor, flatNav } from '../lib/nav';
 import { Avatar } from '../ui/Avatar';
 import { Topbar } from './Topbar';
 import { CommandPalette } from './CommandPalette';
+import { ChatSoporte } from './ChatSoporte';
 import { IconLogout, IconX, IconMail } from '../ui/icons';
 
 // Aviso global cuando el usuario todavía no verificó su email
@@ -201,6 +202,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
 
       <CommandPalette />
+      {user?.role === 'PATIENT' && <ChatSoporte />}
     </div>
   );
 }
