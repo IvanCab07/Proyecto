@@ -7,6 +7,7 @@ import { PressableScale } from '../../../lib/motion';
 import { cn } from '../../../lib/cn';
 import { colors, shadow } from '../../../lib/theme';
 import { IconHome, IconCalendar, IconPlus, IconPill, IconUser } from '../../../components/ui';
+import { ChatSoporte } from '../../../components/ChatSoporte';
 
 const TABS = [
   { name: 'inicio',    Icon: IconHome,     label: 'Inicio' },
@@ -62,16 +63,19 @@ function PatientTabBar({ state, navigation }: MaterialTopTabBarProps) {
 
 export default function PatientTabsLayout() {
   return (
-    <MaterialTopTabs
-      tabBar={(props) => <PatientTabBar {...props} />}
-      tabBarPosition="bottom"
-      screenOptions={{ swipeEnabled: true }}
-    >
-      <MaterialTopTabs.Screen name="inicio" />
-      <MaterialTopTabs.Screen name="turnos" />
-      <MaterialTopTabs.Screen name="solicitar" />
-      <MaterialTopTabs.Screen name="recetas" />
-      <MaterialTopTabs.Screen name="perfil" />
-    </MaterialTopTabs>
+    <View className="flex-1">
+      <MaterialTopTabs
+        tabBar={(props) => <PatientTabBar {...props} />}
+        tabBarPosition="bottom"
+        screenOptions={{ swipeEnabled: true }}
+      >
+        <MaterialTopTabs.Screen name="inicio" />
+        <MaterialTopTabs.Screen name="turnos" />
+        <MaterialTopTabs.Screen name="solicitar" />
+        <MaterialTopTabs.Screen name="recetas" />
+        <MaterialTopTabs.Screen name="perfil" />
+      </MaterialTopTabs>
+      <ChatSoporte />
+    </View>
   );
 }

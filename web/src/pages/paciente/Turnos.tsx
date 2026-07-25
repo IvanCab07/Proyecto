@@ -7,7 +7,7 @@ import { PageTransition } from '../../components/PageTransition';
 import {
   Card, Button, Tabs, StatusBadge, Stars, EmptyState, ConfirmDialog, Dialog, Textarea, SkeletonCards, PageHeader,
 } from '../../ui';
-import { IconCalendar, IconPlus, IconClock } from '../../ui/icons';
+import { IconCalendar, IconPlus, IconClock, IconChevronLeft, IconChevronRight } from '../../ui/icons';
 import { listContainer, listItem } from '../../lib/motion';
 import { formatFecha } from '../../lib/format';
 import { apiError } from '../../lib/apiError';
@@ -33,6 +33,80 @@ function groupProximos(turnos: Turno[]) {
 }
 
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const MESES_COMPLETOS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const DIAS_SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
+function fechaDeTurno(fecha: string) {
+  const [year, month, day] = fecha.slice(0, 10).split('-').map(Number);
+  return new Date(year, month - 1, day, 12);
+}
+
+function claveFecha(fecha: string) {
+  return fecha.slice(0, 10);
+}
+
+function mismaFecha(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function CalendarioTurnos({ turnos }: { turnos: Turno[] }) {
+  const hoy = new Date();
+  const [mesVisible, setMesVisible] = useState(() => new Date(hoy.getFullYear(), hoy.getMonth(), 1));
+  const [fechaSeleccionada, setFechaSeleccionada] = useState<string | null>(null);
+  const turnosPorFecha = turnos.reduce<Record<string, Turno[]>>((acumulado, turno) => {
+    const fecha = claveFecha(turno.fecha);
+    (acumulado[fecha] ??= []).push(turno);
+    return acumulado;
+  }, {});
+  const primerDia = new Date(mesVisible.getFullYear(), mesVisible.getMonth(), 1);
+  const ultimoDia = new Date(mesVisible.getFullYear(), mesVisible.getMonth() + 1, 0);
+  const espaciosIniciales = (primerDia.getDay() + 6) % 7;
+  const dias = Array.from({ length: ultimoDia.getDate() }, (_, indice) => new Date(mesVisible.getFullYear(), mesVisible.getMonth(), indice + 1));
+  const turnosSeleccionados = fechaSeleccionada ? turnosPorFecha[fechaSeleccionada] ?? [] : [];
+  const fechaDetalle = fechaSeleccionada ? fechaDeTurno(fechaSeleccionada) : null;
+
+  return (
+    <Card className="mb-6 overflow-hidden">
+      <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-4 border-b border-slate-100">
+        <div>
+          <h2 className="font-semibold text-slate-900">Calendario de turnos</h2>
+          <p className="text-[13px] text-slate-500 mt-0.5">Seleccioná un día marcado para ver el detalle.</p>
+        </div>
+        <div className="flex items-center gap-1">
+          <button type="button" aria-label="Mes anterior" onClick={() => setMesVisible(actual => new Date(actual.getFullYear(), actual.getMonth() - 1, 1))} className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"><IconChevronLeft /></button>
+          <button type="button" aria-label="Mes siguiente" onClick={() => setMesVisible(actual => new Date(actual.getFullYear(), actual.getMonth() + 1, 1))} className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"><IconChevronRight /></button>
+        </div>
+      </div>
+      <div className="px-3 sm:px-5 pt-4 pb-5">
+        <p className="text-center text-sm font-semibold text-slate-900 mb-4">{MESES_COMPLETOS[mesVisible.getMonth()]} {mesVisible.getFullYear()}</p>
+        <div className="grid grid-cols-7 mb-1">
+          {DIAS_SEMANA.map(dia => <span key={dia} className="text-center text-[11px] font-semibold uppercase tracking-wider text-slate-400 py-1">{dia}</span>)}
+        </div>
+        <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+          {Array.from({ length: espaciosIniciales }).map((_, indice) => <div key={`vacio-${indice}`} />)}
+          {dias.map(dia => {
+            const fecha = `${dia.getFullYear()}-${String(dia.getMonth() + 1).padStart(2, '0')}-${String(dia.getDate()).padStart(2, '0')}`;
+            const turnosDelDia = turnosPorFecha[fecha] ?? [];
+            const tieneTurnos = turnosDelDia.length > 0;
+            const esHoy = mismaFecha(dia, hoy);
+            return <button key={fecha} type="button" disabled={!tieneTurnos} aria-label={tieneTurnos ? `${dia.getDate()} de ${MESES_COMPLETOS[dia.getMonth()]}, ${turnosDelDia.length} turno(s)` : undefined} onClick={() => setFechaSeleccionada(fecha)} className={`relative aspect-square rounded-lg text-sm font-medium transition-colors ${tieneTurnos ? 'bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-100 hover:bg-brand-100 focus:outline-none focus:ring-2 focus:ring-brand-500' : 'text-slate-600 cursor-default'} ${esHoy ? 'ring-2 ring-inset ring-brand-500' : ''}`}>
+              {dia.getDate()}{tieneTurnos && <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-brand-600" />}
+            </button>;
+          })}
+        </div>
+      </div>
+      <Dialog open={!!fechaSeleccionada} onClose={() => setFechaSeleccionada(null)} title="Turnos del día" description={fechaDetalle ? formatFecha(fechaDetalle.toISOString()) : undefined} size="sm">
+        <div className="space-y-3">
+          {turnosSeleccionados.map(turno => <div key={turno.id} className="rounded-lg bg-slate-50 ring-1 ring-inset ring-slate-200 px-3.5 py-3">
+            <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-sm text-slate-900">Dr. {turno.medico.nombre} {turno.medico.apellido}</p><p className="text-[13px] text-slate-500 mt-0.5">{turno.medico.especialidad.nombre}</p></div><StatusBadge status={turno.status} /></div>
+            <p className="flex items-center gap-1.5 text-[13px] text-slate-600 mt-2"><IconClock className="w-3.5 h-3.5" />{turno.hora} hs</p>
+            <p className="text-[13px] text-slate-600 mt-1.5"><span className="font-semibold text-slate-700">Motivo:</span> {turno.motivo || 'Sin motivo informado'}</p>
+          </div>)}
+        </div>
+      </Dialog>
+    </Card>
+  );
+}
 
 function DateTile({ fecha }: { fecha: string }) {
   const d = new Date(fecha);
@@ -228,6 +302,8 @@ export default function PacienteTurnos() {
           </Button>
         }
       />
+
+      <CalendarioTurnos turnos={turnos ?? []} />
 
       <Tabs
         className="mb-6"

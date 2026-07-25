@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react';
-import { View, Text, SectionList, RefreshControl } from 'react-native';
+import { View, Text, SectionList, RefreshControl, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { useMisTurnos, useCancelarTurno, useCrearCalificacion } from '../../../hooks';
 import { useAuthStore } from '../../../hooks/useAuthStore';
 import {
   Card, StatusBadge, Stars, SegmentedTabs, Sheet, Button, Textarea, ScreenHeader, EmptyState, Skeleton, toast,
-  IconClock, IconCheckCircle, IconCalendar, IconCalendarCheck, IconX, IconRefresh, IconStar,
+  IconClock, IconCheckCircle, IconCalendar, IconCalendarCheck, IconX, IconRefresh, IconStar, IconChevronLeft, IconChevronRight,
 } from '../../../components/ui';
 import { PressableScale, stagger } from '../../../lib/motion';
 import { colors, STATUS } from '../../../lib/theme';
@@ -30,6 +30,7 @@ export default function TurnosScreen() {
   const [calificarModal, setCalificarModal] = useState<Turno | null>(null);
   const [estrellas, setEstrellas] = useState(0);
   const [comentario, setComentario] = useState('');
+  const [turnosDelDia, setTurnosDelDia] = useState<Turno[] | null>(null);
 
   const handleCancelar = (t: Turno) => { setCancelModal(t); setRazon(''); };
 
@@ -109,6 +110,10 @@ export default function TurnosScreen() {
         </View>
       </ScreenHeader>
 
+      <View className="px-4 pt-3">
+        <CalendarioTurnos turnos={turnos ?? []} onSelectDay={setTurnosDelDia} />
+      </View>
+
       <View className="px-4 py-3">
         <SegmentedTabs
           value={tab}
@@ -177,7 +182,96 @@ export default function TurnosScreen() {
           <View className="flex-1"><Button fullWidth loading={calificar.isPending} onPress={confirmarCalificacion}>Enviar</Button></View>
         </View>
       </Sheet>
+
+      <Sheet visible={!!turnosDelDia} onClose={() => setTurnosDelDia(null)} title="Turnos del día">
+        <View className="gap-3 pb-2">
+          {turnosDelDia?.map(turno => (
+            <View key={turno.id} className="rounded-xl bg-slate-50 border border-slate-200 p-3.5">
+              <View className="flex-row items-start justify-between gap-2">
+                <View className="flex-1">
+                  <Text className="text-[15px] font-bold text-slate-900">Dr. {turno.medico.nombre} {turno.medico.apellido}</Text>
+                  <Text className="text-[13px] font-semibold text-brand-700 mt-0.5">{turno.medico.especialidad.nombre}</Text>
+                </View>
+                <StatusBadge status={turno.status} />
+              </View>
+              <View className="flex-row items-center gap-1.5 mt-2">
+                <IconClock size={14} color={colors.slate[500]} />
+                <Text className="text-[13px] font-bold text-slate-700">{turno.hora} hs</Text>
+              </View>
+              <Text className="text-[13px] text-slate-600 mt-1.5"><Text className="font-bold text-slate-700">Motivo: </Text>{turno.motivo || 'Sin motivo informado'}</Text>
+            </View>
+          ))}
+        </View>
+      </Sheet>
     </View>
+  );
+}
+
+const MESES_COMPLETOS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const DIAS_SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
+function claveFecha(fecha: string) {
+  return fecha.slice(0, 10);
+}
+
+function CalendarioTurnos({ turnos, onSelectDay }: { turnos: Turno[]; onSelectDay: (turnos: Turno[]) => void }) {
+  const hoy = new Date();
+  const [mesVisible, setMesVisible] = useState(() => new Date(hoy.getFullYear(), hoy.getMonth(), 1));
+  const turnosPorFecha = useMemo(() => turnos.reduce<Record<string, Turno[]>>((acumulado, turno) => {
+    const fecha = claveFecha(turno.fecha);
+    (acumulado[fecha] ??= []).push(turno);
+    return acumulado;
+  }, {}), [turnos]);
+  const primerDia = new Date(mesVisible.getFullYear(), mesVisible.getMonth(), 1);
+  const ultimoDia = new Date(mesVisible.getFullYear(), mesVisible.getMonth() + 1, 0);
+  const espaciosIniciales = (primerDia.getDay() + 6) % 7;
+  const celdas: Array<Date | null> = [
+    ...Array.from({ length: espaciosIniciales }, () => null),
+    ...Array.from({ length: ultimoDia.getDate() }, (_, indice) => new Date(mesVisible.getFullYear(), mesVisible.getMonth(), indice + 1)),
+  ];
+  while (celdas.length % 7 !== 0) celdas.push(null);
+
+  return (
+    <Card className="p-4">
+      <View className="flex-row items-center justify-between mb-4">
+        <View>
+          <Text className="text-[16px] font-bold text-slate-900">Calendario de turnos</Text>
+          <Text className="text-[12px] text-slate-400 mt-0.5">Tocá un día marcado para ver el detalle.</Text>
+        </View>
+        <View className="flex-row gap-1">
+          <Pressable accessibilityLabel="Mes anterior" onPress={() => setMesVisible(actual => new Date(actual.getFullYear(), actual.getMonth() - 1, 1))} className="w-8 h-8 rounded-lg bg-slate-50 items-center justify-center"><IconChevronLeft size={17} color={colors.slate[600]} /></Pressable>
+          <Pressable accessibilityLabel="Mes siguiente" onPress={() => setMesVisible(actual => new Date(actual.getFullYear(), actual.getMonth() + 1, 1))} className="w-8 h-8 rounded-lg bg-slate-50 items-center justify-center"><IconChevronRight size={17} color={colors.slate[600]} /></Pressable>
+        </View>
+      </View>
+      <Text className="text-center text-[14px] font-bold text-slate-900 mb-3">{MESES_COMPLETOS[mesVisible.getMonth()]} {mesVisible.getFullYear()}</Text>
+      <View className="flex-row mb-1">
+        {DIAS_SEMANA.map(dia => <Text key={dia} className="flex-1 text-center text-[10px] font-bold text-slate-400 uppercase">{dia}</Text>)}
+      </View>
+      {Array.from({ length: celdas.length / 7 }, (_, fila) => (
+        <View key={fila} className="flex-row mb-1">
+          {celdas.slice(fila * 7, fila * 7 + 7).map((dia, columna) => {
+            if (!dia) return <View key={columna} className="flex-1 h-10" />;
+            const fecha = `${dia.getFullYear()}-${String(dia.getMonth() + 1).padStart(2, '0')}-${String(dia.getDate()).padStart(2, '0')}`;
+            const turnosDia = turnosPorFecha[fecha] ?? [];
+            const tieneTurnos = turnosDia.length > 0;
+            const esHoy = dia.getFullYear() === hoy.getFullYear() && dia.getMonth() === hoy.getMonth() && dia.getDate() === hoy.getDate();
+            return (
+              <View key={fecha} className="flex-1 px-0.5">
+                <Pressable
+                  disabled={!tieneTurnos}
+                  accessibilityLabel={tieneTurnos ? `${dia.getDate()} de ${MESES_COMPLETOS[dia.getMonth()]}, ${turnosDia.length} turnos` : undefined}
+                  onPress={() => onSelectDay(turnosDia)}
+                  className={`h-10 rounded-lg items-center justify-center ${tieneTurnos ? 'bg-brand-50 border border-brand-100' : ''} ${esHoy ? 'border-2 border-brand-500' : ''}`}
+                >
+                  <Text className={`text-[13px] font-bold ${tieneTurnos ? 'text-brand-700' : 'text-slate-600'}`}>{dia.getDate()}</Text>
+                  {tieneTurnos ? <View className="absolute bottom-1 w-1 h-1 rounded-full bg-brand-600" /> : null}
+                </Pressable>
+              </View>
+            );
+          })}
+        </View>
+      ))}
+    </Card>
   );
 }
 
