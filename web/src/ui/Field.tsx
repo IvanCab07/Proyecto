@@ -50,7 +50,7 @@ export function Field({ label, hint, error, htmlFor, required, className, childr
 const fieldBase = cn(
   'w-full bg-surface rounded-field text-sm text-slate-900 placeholder:text-slate-400',
   'shadow-xs ring-1 ring-inset ring-slate-200',
-  'outline-none focus:outline-none focus:ring-2 focus:ring-brand-600',
+  'outline-none focus:outline-none focus:ring-2 focus:ring-brand-500 focus:shadow-focus',
   'transition-shadow duration-150',
   'disabled:opacity-60 disabled:bg-slate-50',
 );

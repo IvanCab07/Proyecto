@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 import { useEspecialidades, useMedicosPorEspecialidad, useDisponibilidad, useCrearTurno } from '../../hooks';
 import { PageTransition } from '../../components/PageTransition';
-import { Card, Button, Input, Textarea, Stepper, EmptyState } from '../../ui';
+import { Card, Button, Input, Textarea, Stepper, EmptyState, Stars } from '../../ui';
 import { IconCheck, IconChevronLeft, IconUser, IconAlert } from '../../ui/icons';
 import { wizardStep } from '../../lib/motion';
 import { formatFecha } from '../../lib/format';
@@ -150,6 +150,20 @@ export default function PacienteSolicitar() {
                         <span className="block text-xs text-slate-400 mt-0.5">
                           Matrícula {m.matricula}{!m.disponible && ' · No disponible'}
                         </span>
+                        {/* Reputación del médico, para poder elegir con más información */}
+                        {m.cantidad ? (
+                          <span className="flex items-center gap-1.5 mt-1.5">
+                            <Stars value={m.promedio ?? 0} size={13} />
+                            <span className="text-xs font-semibold text-slate-600 tnum">
+                              {(m.promedio ?? 0).toFixed(1)}
+                            </span>
+                            <span className="text-xs text-slate-400">
+                              · {m.cantidad} {m.cantidad === 1 ? 'reseña' : 'reseñas'}
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="block text-xs text-slate-400 mt-1.5">Sin reseñas todavía</span>
+                        )}
                       </OptionButton>
                     ))}
                   </div>

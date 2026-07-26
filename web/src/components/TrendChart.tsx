@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card } from '../ui';
 import { cn } from '../lib/cn';
-import { CHART, tooltipStyle, axisTickStyle } from '../lib/chartTheme';
+import { useChartTheme } from '../lib/chartTheme';
 import type { TrendPoint } from '../services';
 
 const PERIODOS = [
@@ -20,6 +20,7 @@ interface TrendChartProps {
 // Gráfico de turnos creados por período, con datos reales que llegan del backend.
 export function TrendChart({ tendencia, title = 'Turnos creados', height = 220, className }: TrendChartProps) {
   const [periodo, setPeriodo] = useState<'dias' | 'meses'>('dias');
+  const { brand, grid, tooltipStyle, axisTickStyle } = useChartTheme();
   const data = periodo === 'dias' ? tendencia.dias : tendencia.meses;
   const totalPeriodo = data.reduce((acc, d) => acc + d.total, 0);
   const pico = Math.max(...data.map(d => d.total), 0);
@@ -41,7 +42,7 @@ export function TrendChart({ tendencia, title = 'Turnos creados', height = 220, 
               onClick={() => setPeriodo(p.id)}
               className={cn(
                 'px-3 py-1 rounded-md transition-colors',
-                periodo === p.id ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-700',
+                periodo === p.id ? 'bg-surface text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-700',
               )}
             >
               {p.label}
@@ -54,22 +55,22 @@ export function TrendChart({ tendencia, title = 'Turnos creados', height = 220, 
         <AreaChart data={data} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
           <defs>
             <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={CHART.brand} stopOpacity={0.16} />
-              <stop offset="100%" stopColor={CHART.brand} stopOpacity={0} />
+              <stop offset="0%" stopColor={brand} stopOpacity={0.16} />
+              <stop offset="100%" stopColor={brand} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke={grid} vertical={false} />
           <XAxis dataKey="label" tick={axisTickStyle} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={18} />
           <YAxis tick={axisTickStyle} axisLine={false} tickLine={false} allowDecimals={false} width={28} />
-          <Tooltip contentStyle={tooltipStyle} cursor={{ stroke: CHART.grid }} formatter={(val) => [`${val} turnos`, '']} />
+          <Tooltip contentStyle={tooltipStyle} cursor={{ stroke: grid }} formatter={(val) => [`${val} turnos`, '']} />
           <Area
             type="monotone"
             dataKey="total"
-            stroke={CHART.brand}
+            stroke={brand}
             strokeWidth={2}
             fill="url(#trendFill)"
             dot={false}
-            activeDot={{ r: 4, fill: CHART.brand }}
+            activeDot={{ r: 4, fill: brand }}
             animationDuration={600}
           />
         </AreaChart>

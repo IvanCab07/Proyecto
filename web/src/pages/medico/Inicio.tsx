@@ -4,18 +4,21 @@ import { useMiAgenda, useMisCalificacionesMedico } from '../../hooks';
 import { useAuthStore } from '../../store/useAuthStore';
 import { PageTransition } from '../../components/PageTransition';
 import {
-  Card, StatCard, StatusBadge, EmptyState, SkeletonStatCard, SkeletonTable,
+  Card, StatCard, StatusBadge, EmptyState, SkeletonStatCard, SkeletonTable, AlertInline,
   Table, THead, TH, TBody, TR, TD,
 } from '../../ui';
 import {
   IconCalendar, IconClock, IconCheckCircle, IconPill, IconUsers, IconSparkle, IconArrowRight,
+  IconClipboard,
 } from '../../ui/icons';
+import { claveFecha, hoyISO } from '../../lib/fechas';
 
 const ACCESOS = [
-  { label: 'Mi agenda',      desc: 'Turnos asignados',    icon: <IconCalendar />, to: '/medico/agenda' },
-  { label: 'Mis pacientes',  desc: 'Historial y recetas', icon: <IconUsers />,    to: '/medico/pacientes' },
-  { label: 'Recetas',        desc: 'Emití y consultá',    icon: <IconPill />,     to: '/medico/recetas' },
-  { label: 'Calificaciones', desc: 'Reseñas recibidas',   icon: <IconSparkle />,  to: '/medico/calificaciones' },
+  { label: 'Mi agenda',          desc: 'Calendario de turnos',    icon: <IconCalendar />,  to: '/medico/agenda' },
+  { label: 'Administrar turnos', desc: 'Cambiar y corregir estados', icon: <IconClipboard />, to: '/medico/turnos' },
+  { label: 'Mis pacientes',      desc: 'Historial, recetas y estudios', icon: <IconUsers />, to: '/medico/pacientes' },
+  { label: 'Recetas',            desc: 'Emití y consultá',        icon: <IconPill />,      to: '/medico/recetas' },
+  { label: 'Calificaciones',     desc: 'Reseñas recibidas',       icon: <IconSparkle />,   to: '/medico/calificaciones' },
 ];
 
 export default function MedicoInicio() {
@@ -23,28 +26,33 @@ export default function MedicoInicio() {
   const { data: agenda, isLoading } = useMiAgenda();
   const { data: calif } = useMisCalificacionesMedico();
 
-  const today = new Date().toISOString().slice(0, 10);
-  const { hoy, proximos, completados } = useMemo(() => {
+  const today = hoyISO();
+  const { hoy, proximos, completados, enEspera } = useMemo(() => {
     const list = agenda ?? [];
+    const activo = (s: string) => s === 'PENDIENTE' || s === 'CONFIRMADO';
     return {
-      hoy: list.filter(t => t.fecha.slice(0, 10) === today && (t.status === 'PENDIENTE' || t.status === 'CONFIRMADO')),
-      proximos: list.filter(t => t.fecha.slice(0, 10) > today && (t.status === 'PENDIENTE' || t.status === 'CONFIRMADO')).length,
+      hoy: list
+        .filter(t => claveFecha(t.fecha) === today && activo(t.status))
+        .sort((a, b) => a.hora.localeCompare(b.hora)),
+      proximos: list.filter(t => claveFecha(t.fecha) > today && activo(t.status)).length,
       completados: list.filter(t => t.status === 'COMPLETADO').length,
+      // Sobreturnos en cola: esperan a que se libere un horario y antes no se veían en ningún lado
+      enEspera: list.filter(t => t.status === 'EN_ESPERA').length,
     };
   }, [agenda, today]);
 
   return (
     <PageTransition>
       {/* Hero */}
-      <div className="relative overflow-hidden rounded-card bg-rail bg-gradient-to-br from-[#0C2422] via-rail to-[#0A1615] text-white p-6 sm:p-7 mb-6">
+      <div className="relative overflow-hidden rounded-card gradient-card text-rail-fg p-6 sm:p-7 mb-6">
         <div
           className="absolute -top-24 -right-16 w-80 h-80 rounded-full opacity-30 pointer-events-none"
-          style={{ background: 'radial-gradient(circle, #14B8A6, transparent 70%)' }}
+          style={{ background: 'radial-gradient(circle, #7BDC93, transparent 70%)' }}
         />
         <div className="relative">
           <p className="text-brand-300 text-sm font-medium">Panel del médico</p>
           <h1 className="text-[26px] sm:text-[30px] font-bold tracking-tighter2 mt-1 leading-tight">Hola, Dr. {user?.apellido}</h1>
-          <p className="text-slate-300 text-sm mt-2">
+          <p className="text-rail-fg/70 text-sm mt-2">
             {hoy.length === 0 ? 'No tenés turnos para hoy.' : `Tenés ${hoy.length} ${hoy.length === 1 ? 'turno' : 'turnos'} para hoy.`}
           </p>
         </div>
@@ -68,6 +76,17 @@ export default function MedicoInicio() {
             hint={calif?.cantidad ? `Promedio ${calif.promedio.toFixed(1)} ★` : undefined}
           />
         </div>
+      )}
+
+      {enEspera > 0 && (
+        <Link to="/medico/turnos" className="block mb-6">
+          <AlertInline tono="info">
+            {enEspera === 1
+              ? 'Tenés 1 sobreturno en espera de que se libere un horario.'
+              : `Tenés ${enEspera} sobreturnos en espera de que se libere un horario.`}
+            {' '}Verlos en Administrar turnos.
+          </AlertInline>
+        </Link>
       )}
 
       <div className="grid gap-6 lg:grid-cols-3 items-start">

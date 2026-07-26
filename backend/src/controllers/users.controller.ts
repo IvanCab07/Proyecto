@@ -3,6 +3,9 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { HttpError, formatZodError } from '../lib/httpError';
+import {
+  nombreSchema, dniSchema, matriculaSchema, telefonoOpcionalSchema, emailSchema, passwordSchema,
+} from '../lib/validaciones';
 
 // Campos que devolvemos de un usuario (nunca la contraseña)
 const USER_SELECT = {
@@ -14,6 +17,8 @@ const USER_SELECT = {
   telefono: true,
   role: true,
   activo: true,
+  motivoBaja: true,
+  desactivadoAt: true,
   puedeCalificar: true,
   createdAt: true,
   medico: { select: { id: true, matricula: true, especialidad: { select: { id: true, nombre: true } } } },
@@ -75,14 +80,14 @@ export const getUsuarios = async (req: Request, res: Response) => {
 };
 
 const crearUsuarioSchema = z.object({
-  email:          z.string().email(),
-  password:       z.string().min(6),
-  nombre:         z.string().min(2),
-  apellido:       z.string().min(2),
-  dni:            z.string().min(7).max(11),
-  telefono:       z.string().optional(),
+  email:          emailSchema,
+  password:       passwordSchema,
+  nombre:         nombreSchema,
+  apellido:       nombreSchema,
+  dni:            dniSchema,
+  telefono:       telefonoOpcionalSchema,
   role:           z.enum(['PATIENT', 'ADMIN', 'MEDICO']).default('PATIENT'),
-  matricula:      z.string().min(4).optional(),
+  matricula:      matriculaSchema.optional(),
   especialidadId: z.string().uuid().optional(),
 }).refine((d) => d.role !== 'MEDICO' || (!!d.matricula && !!d.especialidadId), {
   message: 'Un médico necesita matrícula y especialidad',
@@ -124,11 +129,12 @@ export const crearUsuario = async (req: Request, res: Response) => {
 };
 
 const actualizarUsuarioSchema = z.object({
-  nombre:         z.string().min(2).optional(),
-  apellido:       z.string().min(2).optional(),
-  telefono:       z.string().optional(),
+  nombre:         nombreSchema.optional(),
+  apellido:       nombreSchema.optional(),
+  telefono:       telefonoOpcionalSchema,
   role:           z.enum(['PATIENT', 'ADMIN', 'MEDICO']).optional(),
   activo:         z.boolean().optional(),
+  motivoBaja:     z.string().trim().max(200).optional(),  // por qué se da de baja la cuenta
   puedeCalificar: z.boolean().optional(),  // el admin habilita/revoca que el paciente califique
 });
 
@@ -137,7 +143,7 @@ export const actualizarUsuario = async (req: Request, res: Response) => {
   const { id } = req.params;
   const result = actualizarUsuarioSchema.safeParse(req.body);
   if (!result.success) return res.status(400).json({ error: formatZodError(result.error) });
-  const data = result.data;
+  const { motivoBaja, ...data } = result.data;
 
   // No permitir que el admin se bloquee a sí mismo
   if (id === req.user!.userId) {
@@ -153,11 +159,45 @@ export const actualizarUsuario = async (req: Request, res: Response) => {
     throw new HttpError(400, 'Para convertir esta cuenta en médico, creala como médico (necesita matrícula y especialidad).');
   }
 
-  const user = await prisma.user.update({ where: { id }, data, select: USER_SELECT });
+  // El sistema no puede quedarse sin ningún admin operativo: ni dando de baja al
+  // último que queda, ni bajándole el rol (aunque no sea la cuenta propia).
+  const pierdeElUltimoAdmin =
+    target.role === 'ADMIN' &&
+    target.activo &&
+    (data.activo === false || (!!data.role && data.role !== 'ADMIN'));
+  if (pierdeElUltimoAdmin) {
+    const adminsActivos = await prisma.user.count({ where: { role: 'ADMIN', activo: true } });
+    if (adminsActivos <= 1) {
+      throw new HttpError(400, 'Es el único administrador activo. Designá otro antes de dar de baja o cambiar el rol de esta cuenta.');
+    }
+  }
+
+  // Los datos de la baja se completan al desactivar y se limpian al reactivar
+  const datosBaja =
+    data.activo === false ? { motivoBaja: motivoBaja || null, desactivadoAt: new Date() }
+    : data.activo === true ? { motivoBaja: null, desactivadoAt: null }
+    : {};
+
+  const user = await prisma.$transaction(async (tx) => {
+    const actualizado = await tx.user.update({
+      where: { id },
+      data: { ...data, ...datosBaja },
+      select: USER_SELECT,
+    });
+
+    // Un médico dado de baja no puede seguir apareciendo como disponible:
+    // los pacientes le seguirían sacando turnos a alguien que no puede entrar.
+    if (data.activo === false && target.medico) {
+      await tx.medico.update({ where: { id: target.medico.id }, data: { disponible: false } });
+    }
+
+    return actualizado;
+  });
+
   return res.json(user);
 };
 
-const resetPasswordSchema = z.object({ password: z.string().min(6) });
+const resetPasswordSchema = z.object({ password: passwordSchema });
 
 // ── Admin: resetear la contraseña de una cuenta ──
 export const resetPassword = async (req: Request, res: Response) => {

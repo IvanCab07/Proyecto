@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 import {
   IconGrid, IconCalendar, IconCalendarDays, IconUsers, IconStethoscope, IconTag,
   IconChart, IconSettings, IconHome, IconPlus, IconPill, IconFolder, IconUser, IconShield, IconMapPin, IconSparkle,
+  IconClipboard,
 } from '../ui/icons';
 
 export interface NavItem {
@@ -20,6 +21,7 @@ export const adminNav: NavGroup[] = [
     label: 'Panel',
     items: [
       { to: '/admin/dashboard', label: 'Dashboard', icon: IconGrid },
+      { to: '/admin/turnos',    label: 'Turnos',    icon: IconCalendar },
     ],
   },
   {
@@ -74,11 +76,12 @@ export const medicoNav: NavGroup[] = [
   {
     label: 'Atención',
     items: [
-      { to: '/medico/inicio',         label: 'Inicio',        icon: IconHome },
-      { to: '/medico/agenda',         label: 'Mi agenda',     icon: IconCalendarDays },
-      { to: '/medico/pacientes',      label: 'Mis pacientes', icon: IconUsers },
-      { to: '/medico/recetas',        label: 'Recetas',       icon: IconPill },
-      { to: '/medico/calificaciones', label: 'Calificaciones', icon: IconSparkle },
+      { to: '/medico/inicio',         label: 'Inicio',             icon: IconHome },
+      { to: '/medico/agenda',         label: 'Mi agenda',          icon: IconCalendarDays },
+      { to: '/medico/turnos',         label: 'Administrar turnos', icon: IconClipboard },
+      { to: '/medico/pacientes',      label: 'Mis pacientes',      icon: IconUsers },
+      { to: '/medico/recetas',        label: 'Recetas',            icon: IconPill },
+      { to: '/medico/calificaciones', label: 'Calificaciones',     icon: IconSparkle },
     ],
   },
   {

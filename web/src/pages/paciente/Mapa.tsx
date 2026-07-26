@@ -26,7 +26,7 @@ function pinIcon(color: string) {
   });
 }
 
-const ICON_HOSPITAL = pinIcon('#0D9488');
+const ICON_HOSPITAL = pinIcon('#16A34A');
 const ICON_CAPS = pinIcon('#0EA5E9');
 
 // Centra el mapa en el lugar seleccionado de forma imperativa.
@@ -76,7 +76,8 @@ export default function PacienteMapa() {
       <div className="grid lg:grid-cols-3 gap-4 items-start">
         {/* Mapa */}
         <Card className="lg:col-span-2 overflow-hidden p-0">
-          <div className="h-[360px] sm:h-[460px] lg:h-[620px]">
+          {/* leaflet-dark: filtro sobre los tiles de OSM, que solo vienen en claro */}
+          <div className="h-[360px] sm:h-[460px] lg:h-[620px] leaflet-dark">
             <MapContainer
               center={[HOSPITAL.lat, HOSPITAL.lng]}
               zoom={14}
@@ -107,7 +108,7 @@ export default function PacienteMapa() {
                 <Circle
                   center={[userPos.lat, userPos.lng]}
                   radius={120}
-                  pathOptions={{ color: '#0D9488', fillColor: '#14B8A6', fillOpacity: 0.4 }}
+                  pathOptions={{ color: '#16A34A', fillColor: '#22C55E', fillOpacity: 0.4 }}
                 />
               )}
               <FlyTo center={flyCenter} />

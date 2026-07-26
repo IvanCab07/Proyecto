@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { apiError } from '../../lib/apiError';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -12,17 +11,19 @@ import { SeguridadCard } from '../../components/SeguridadCard';
 import { Card, Button, Dialog, Input, PasswordInput, PageHeader, StatCard } from '../../ui';
 import {
   IconEdit, IconKey, IconAlert, IconIdCard, IconPhone, IconMail,
-  IconCalendar, IconPill, IconFolder, IconPlus, IconMapPin, IconArrowRight,
+  IconCalendar, IconPill, IconFolder,
 } from '../../ui/icons';
 import { iniciales } from '../../lib/format';
+import { estadoReceta } from '../../lib/fechas';
+import { useFormulario } from '../../lib/useFormulario';
+import {
+  LIMITES, limpiar, formatearTelefono,
+  validarNombre, validarTelefono, validarPassword, validarConfirmacion,
+} from '../../lib/validaciones';
 
-const ACCESOS = [
-  { label: 'Solicitar turno', desc: 'Reservá con un médico', icon: <IconPlus />, to: '/paciente/solicitar' },
-  { label: 'Mis turnos',      desc: 'Próximos e historial',  icon: <IconCalendar />, to: '/paciente/turnos' },
-  { label: 'Recetas',         desc: 'Tus indicaciones',      icon: <IconPill />, to: '/paciente/recetas' },
-  { label: 'Estudios',        desc: 'Subí y consultá',       icon: <IconFolder />, to: '/paciente/estudios' },
-  { label: 'Centros y mapa',  desc: 'Cómo llegar',           icon: <IconMapPin />, to: '/paciente/mapa' },
-];
+// Acá NO va una grilla de accesos rápidos: la misma lista ya está en el menú lateral y en
+// Inicio. Esta pantalla es sobre los datos de la cuenta, y repetir el menú una tercera vez
+// empujaba la tarjeta de seguridad abajo de todo.
 
 export default function PacientePerfil() {
   const { user } = useAuthStore();
@@ -34,25 +35,44 @@ export default function PacientePerfil() {
 
   const [modalPerfil, setModalPerfil] = useState(false);
   const [modalPwd, setModalPwd] = useState(false);
-  const [perfilForm, setPerfilForm] = useState({ nombre: '', apellido: '', telefono: '' });
-  const [pwdForm, setPwdForm] = useState({ passwordActual: '', passwordNueva: '', confirm: '' });
   const [perfilError, setPerfilError] = useState('');
   const [pwdError, setPwdError] = useState('');
+
+  const perfil = useFormulario(
+    { nombre: '', apellido: '', telefono: '' },
+    {
+      nombre:   v => validarNombre(v, 'El nombre'),
+      apellido: v => validarNombre(v, 'El apellido'),
+      telefono: validarTelefono,
+    },
+  );
+
+  const pwd = useFormulario(
+    { passwordActual: '', passwordNueva: '', confirm: '' },
+    {
+      passwordActual: v => (v ? undefined : 'Ingresá tu contraseña actual'),
+      passwordNueva:  validarPassword,
+      confirm:        (v, todos) => validarConfirmacion(todos.passwordNueva, v),
+    },
+  );
 
   const today = new Date().toISOString().slice(0, 10);
   const proximos = (turnos ?? []).filter(
     t => t.fecha.slice(0, 10) >= today && (t.status === 'PENDIENTE' || t.status === 'CONFIRMADO'),
   ).length;
   const completados = (turnos ?? []).filter(t => t.status === 'COMPLETADO').length;
+  const recetasVigentes = (recetas ?? []).filter(r => estadoReceta(r.validoHasta) !== 'vencida').length;
 
   const abrirPerfil = () => {
-    setPerfilForm({ nombre: user?.nombre ?? '', apellido: user?.apellido ?? '', telefono: user?.telefono ?? '' });
+    perfil.reiniciar({
+      nombre: user?.nombre ?? '', apellido: user?.apellido ?? '', telefono: user?.telefono ?? '',
+    });
     setPerfilError('');
     setModalPerfil(true);
   };
 
   const abrirPwd = () => {
-    setPwdForm({ passwordActual: '', passwordNueva: '', confirm: '' });
+    pwd.reiniciar();
     setPwdError('');
     setModalPwd(true);
   };
@@ -60,11 +80,13 @@ export default function PacientePerfil() {
   const handlePerfil = async (e: FormEvent) => {
     e.preventDefault();
     setPerfilError('');
+    if (!perfil.validarTodo()) return;
+
     try {
       await actualizarPerfil.mutateAsync({
-        nombre: perfilForm.nombre,
-        apellido: perfilForm.apellido,
-        telefono: perfilForm.telefono || undefined,
+        nombre: limpiar(perfil.valores.nombre),
+        apellido: limpiar(perfil.valores.apellido),
+        telefono: perfil.valores.telefono.trim() || undefined,
       });
       toast.success('Datos actualizados');
       setModalPerfil(false);
@@ -76,12 +98,12 @@ export default function PacientePerfil() {
   const handlePwd = async (e: FormEvent) => {
     e.preventDefault();
     setPwdError('');
-    if (pwdForm.passwordNueva !== pwdForm.confirm) return setPwdError('Las contraseñas no coinciden');
-    if (pwdForm.passwordNueva.length < 6) return setPwdError('La nueva contraseña debe tener al menos 6 caracteres');
+    if (!pwd.validarTodo()) return;
+
     try {
       await cambiarPassword.mutateAsync({
-        passwordActual: pwdForm.passwordActual,
-        passwordNueva: pwdForm.passwordNueva,
+        passwordActual: pwd.valores.passwordActual,
+        passwordNueva: pwd.valores.passwordNueva,
       });
       toast.success('Contraseña actualizada');
       setModalPwd(false);
@@ -103,10 +125,10 @@ export default function PacientePerfil() {
       <div className="grid gap-4 lg:grid-cols-3 items-start">
         {/* Tarjeta de cuenta */}
         <Card className="overflow-hidden lg:row-span-2">
-          <div className="bg-rail bg-gradient-to-br from-[#0C2422] via-rail to-[#0A1615] h-20" />
+          <div className="gradient-card h-20" />
           <div className="px-6 pb-6">
             <div className="flex items-end gap-4 -mt-8">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 text-white grid place-items-center font-bold text-2xl select-none shrink-0 ring-4 ring-surface shadow-glow-brand">
+              <div className="w-16 h-16 rounded-2xl bg-mint-grad text-rail grid place-items-center font-bold text-2xl select-none shrink-0 ring-4 ring-surface shadow-glow-mint">
                 {iniciales(user?.nombre, user?.apellido)}
               </div>
               <span className="text-xs font-semibold px-2.5 py-1 rounded-pill bg-brand-100 text-brand-800 mb-1">
@@ -145,44 +167,29 @@ export default function PacientePerfil() {
         <div className="lg:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard label="Turnos próximos" value={proximos} icon={<IconCalendar />} tone="brand" />
           <StatCard label="Completados" value={completados} icon={<IconCalendar />} tone="success" />
-          <StatCard label="Recetas" value={recetas?.length ?? 0} icon={<IconPill />} tone="accent" />
+          <StatCard label="Recetas vigentes" value={recetasVigentes} icon={<IconPill />} tone="accent" />
           <StatCard label="Estudios" value={estudios?.length ?? 0} icon={<IconFolder />} tone="warning" />
         </div>
 
-        {/* Accesos rápidos */}
-        <Card className="lg:col-span-2 p-5">
-          <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-            <IconArrowRight className="w-4 h-4 text-slate-400" /> Accesos rápidos
-          </h3>
-          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
-            {ACCESOS.map(a => (
-              <Link
-                key={a.to}
-                to={a.to}
-                className="group flex items-center gap-3 rounded-field ring-1 ring-inset ring-slate-100 hover:ring-brand-200 hover:bg-brand-50/40 px-3.5 py-3 transition-colors"
-              >
-                <span className="w-9 h-9 rounded-lg bg-brand-50 text-brand-600 grid place-items-center shrink-0 group-hover:bg-brand-600 group-hover:text-white transition-colors [&>svg]:w-4 [&>svg]:h-4">
-                  {a.icon}
-                </span>
-                <span className="flex-1 min-w-0">
-                  <span className="block text-sm font-semibold text-slate-900">{a.label}</span>
-                  <span className="block text-xs text-slate-400 truncate">{a.desc}</span>
-                </span>
-              </Link>
-            ))}
-          </div>
-        </Card>
-
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-2">
           <SeguridadCard />
         </div>
       </div>
 
       <Dialog open={modalPerfil} onClose={() => setModalPerfil(false)} title="Editar datos">
-        <form onSubmit={handlePerfil} className="space-y-4">
-          <Input label="Nombre" required value={perfilForm.nombre} onChange={e => setPerfilForm(p => ({ ...p, nombre: e.target.value }))} />
-          <Input label="Apellido" required value={perfilForm.apellido} onChange={e => setPerfilForm(p => ({ ...p, apellido: e.target.value }))} />
-          <Input label="Teléfono" hint="Opcional" value={perfilForm.telefono} onChange={e => setPerfilForm(p => ({ ...p, telefono: e.target.value }))} />
+        <form onSubmit={handlePerfil} className="space-y-4" noValidate>
+          <Input label="Nombre" required maxLength={LIMITES.nombre} {...perfil.campo('nombre')} />
+          <Input label="Apellido" required maxLength={LIMITES.apellido} {...perfil.campo('apellido')} />
+          <Input
+            label="Teléfono"
+            type="tel"
+            hint="Opcional"
+            maxLength={LIMITES.telefono}
+            placeholder="11 1234-5678"
+            {...perfil.campo('telefono')}
+            // Se descartan las letras al tipear, igual que en el registro.
+            onChange={e => perfil.setCampo('telefono', formatearTelefono(e.target.value))}
+          />
           {perfilError && (
             <div className="flex items-center gap-2.5 bg-danger-soft text-danger-text rounded-field px-3.5 py-3 text-[13px] font-medium">
               <IconAlert className="shrink-0" />
@@ -197,10 +204,10 @@ export default function PacientePerfil() {
       </Dialog>
 
       <Dialog open={modalPwd} onClose={() => setModalPwd(false)} title="Cambiar contraseña">
-        <form onSubmit={handlePwd} className="space-y-4">
-          <PasswordInput label="Contraseña actual" required autoComplete="current-password" value={pwdForm.passwordActual} onChange={e => setPwdForm(p => ({ ...p, passwordActual: e.target.value }))} />
-          <PasswordInput label="Nueva contraseña" required autoComplete="new-password" hint="Mínimo 6 caracteres" value={pwdForm.passwordNueva} onChange={e => setPwdForm(p => ({ ...p, passwordNueva: e.target.value }))} />
-          <PasswordInput label="Confirmar nueva contraseña" required autoComplete="new-password" value={pwdForm.confirm} onChange={e => setPwdForm(p => ({ ...p, confirm: e.target.value }))} />
+        <form onSubmit={handlePwd} className="space-y-4" noValidate>
+          <PasswordInput label="Contraseña actual" required autoComplete="current-password" maxLength={LIMITES.password} {...pwd.campo('passwordActual')} />
+          <PasswordInput label="Nueva contraseña" required autoComplete="new-password" maxLength={LIMITES.password} hint={`Mínimo ${LIMITES.passwordMin} caracteres`} {...pwd.campo('passwordNueva')} />
+          <PasswordInput label="Confirmar nueva contraseña" required autoComplete="new-password" maxLength={LIMITES.password} {...pwd.campo('confirm')} />
           {pwdError && (
             <div className="flex items-center gap-2.5 bg-danger-soft text-danger-text rounded-field px-3.5 py-3 text-[13px] font-medium">
               <IconAlert className="shrink-0" />

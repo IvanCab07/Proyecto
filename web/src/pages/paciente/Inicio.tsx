@@ -10,6 +10,7 @@ import {
 } from '../../ui/icons';
 import { listContainer, listItem } from '../../lib/motion';
 import { formatFecha, formatFechaLarga } from '../../lib/format';
+import { estadoReceta } from '../../lib/fechas';
 import { cn } from '../../lib/cn';
 import type { Turno } from '../../services';
 
@@ -34,8 +35,8 @@ function NextTurnoCard({ t }: { t: Turno }) {
           <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-600 mt-0.5">{MESES[d.getUTCMonth()]}</p>
         </div>
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-slate-900 truncate">Dr. {t.medico.nombre} {t.medico.apellido}</p>
-          <p className="text-sm text-slate-500">{t.medico.especialidad.nombre}</p>
+          <p className="font-semibold text-slate-900 truncate">Dr. {t.medico?.nombre} {t.medico?.apellido}</p>
+          <p className="text-sm text-slate-500">{t.medico?.especialidad.nombre}</p>
           <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-[13px] text-slate-600">
             <span className="flex items-center gap-1.5"><IconCalendar className="w-4 h-4 text-slate-400" /> {formatFecha(t.fecha)}</span>
             <span className="flex items-center gap-1.5"><IconClock className="w-4 h-4 text-slate-400" /> {t.hora} hs</span>
@@ -61,9 +62,13 @@ export default function PacienteInicio() {
   const next = proximos[0];
   const completados = (turnos ?? []).filter(t => t.status === 'COMPLETADO').length;
 
+  // Solo las que todavía sirven: una receta vencida no es algo que el paciente pueda usar,
+  // y contarla acá inflaba el número sin decirle nada.
+  const recetasVigentes = (recetas ?? []).filter(r => estadoReceta(r.validoHasta) !== 'vencida');
+
   const stats = [
     { label: 'Turnos próximos', value: proximos.length, icon: <IconCalendar />, to: '/paciente/turnos', tone: 'brand' as const },
-    { label: 'Recetas',         value: recetas?.length ?? 0, icon: <IconPill />, to: '/paciente/recetas', tone: 'success' as const },
+    { label: 'Recetas vigentes', value: recetasVigentes.length, icon: <IconPill />, to: '/paciente/recetas', tone: 'success' as const },
     { label: 'Estudios',        value: estudios?.length ?? 0, icon: <IconFolder />, to: '/paciente/estudios', tone: 'info' as const },
     { label: 'Completados',     value: completados, icon: <IconCheckCircle />, to: '/paciente/turnos', tone: 'warning' as const },
   ];
@@ -83,16 +88,16 @@ export default function PacienteInicio() {
     { label: 'Centros y mapa',  desc: 'Cómo llegar',           icon: <IconMapPin />, to: '/paciente/mapa' },
   ];
 
-  const ultimasRecetas = (recetas ?? []).slice(0, 3);
+  const ultimasRecetas = recetasVigentes.slice(0, 3);
   const ultimosEstudios = (estudios ?? []).slice(0, 3);
 
   return (
     <PageTransition>
       {/* Hero */}
-      <div className="relative overflow-hidden rounded-card bg-rail bg-gradient-to-br from-[#0C2422] via-rail to-[#0A1615] text-white p-6 sm:p-8 mb-6">
+      <div className="relative overflow-hidden rounded-card gradient-card text-rail-fg p-6 sm:p-8 mb-6">
         <div
           className="absolute -top-24 -right-16 w-80 h-80 rounded-full opacity-30 pointer-events-none"
-          style={{ background: 'radial-gradient(circle, #14B8A6, transparent 70%)' }}
+          style={{ background: 'radial-gradient(circle, #7BDC93, transparent 70%)' }}
         />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -100,12 +105,12 @@ export default function PacienteInicio() {
             <h1 className="text-[28px] sm:text-[32px] font-bold tracking-tighter2 mt-1 leading-tight">
               {user?.nombre} {user?.apellido}
             </h1>
-            <p className="text-slate-300 text-sm mt-2 capitalize">{formatFechaLarga(new Date().toISOString())}</p>
+            <p className="text-rail-fg/70 text-sm mt-2 capitalize">{formatFechaLarga(new Date().toISOString())}</p>
           </div>
           <Button
             onClick={() => navigate('/paciente/solicitar')}
             iconLeft={<IconPlus />}
-            className="!bg-white !text-rail hover:!bg-brand-50 shadow-btn"
+            className="!bg-white !text-rail hover:!bg-white/90 shadow-btn"
           >
             Solicitar turno
           </Button>
@@ -184,18 +189,32 @@ export default function PacienteInicio() {
               <Link to="/paciente/recetas" className="text-[13px] font-semibold text-brand-700 hover:text-brand-800">Ver</Link>
             </div>
             {ultimasRecetas.length === 0 ? (
-              <p className="text-sm text-slate-400 py-3">Todavía no tenés recetas.</p>
+              <p className="text-sm text-slate-400 py-3">No tenés recetas vigentes.</p>
             ) : (
               <ul className="space-y-3">
-                {ultimasRecetas.map(r => (
-                  <li key={r.id} className="flex items-start gap-3">
-                    <span className="w-9 h-9 rounded-lg bg-success-soft text-success-text grid place-items-center shrink-0 [&>svg]:w-4 [&>svg]:h-4"><IconPill /></span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-semibold text-slate-800 truncate">{r.medicamento}</p>
-                      <p className="text-xs text-slate-400 truncate">{r.dosis} · {formatFecha(r.fechaEmision)}</p>
-                    </div>
-                  </li>
-                ))}
+                {ultimasRecetas.map(r => {
+                  const porVencer = estadoReceta(r.validoHasta) === 'por-vencer';
+                  return (
+                    <li key={r.id} className="flex items-start gap-3">
+                      <span className={cn(
+                        'w-9 h-9 rounded-lg grid place-items-center shrink-0 [&>svg]:w-4 [&>svg]:h-4',
+                        porVencer ? 'bg-warning-soft text-warning-text' : 'bg-success-soft text-success-text',
+                      )}>
+                        <IconPill />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] font-semibold text-slate-800 truncate">{r.medicamento}</p>
+                        <p className="text-xs text-slate-400 truncate">{r.dosis} · {formatFecha(r.fechaEmision)}</p>
+                      </div>
+                      {porVencer && (
+                        <span
+                          className="w-2 h-2 rounded-full bg-warning mt-1.5 shrink-0"
+                          title={`Vence el ${formatFecha(r.validoHasta)}`}
+                        />
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </Card>

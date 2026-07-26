@@ -9,6 +9,7 @@ import {
 } from '../../ui';
 import { IconPlus, IconTag, IconEdit, IconTrash, IconDots, IconStethoscope, IconAlert, IconUsers } from '../../ui/icons';
 import { listContainer, listItem } from '../../lib/motion';
+import { LIMITES, limpiar, normalizar, validarEspecialidad } from '../../lib/validaciones';
 import type { Especialidad } from '../../services';
 
 export default function AdminEspecialidades() {
@@ -17,24 +18,43 @@ export default function AdminEspecialidades() {
   const [editando, setEditando] = useState<Especialidad | null>(null);
   const [eliminando, setEliminando] = useState<Especialidad | null>(null);
   const [error, setError] = useState('');
+  const [errorNombre, setErrorNombre] = useState('');
 
   const { data: especialidades, isLoading } = useEspecialidades();
   const crear = useCrearEspecialidad();
   const actualizar = useActualizarEspecialidad();
   const eliminar = useEliminarEspecialidad();
 
-  const openCrear = () => { setNombre(''); setError(''); setModal('crear'); };
-  const openEditar = (e: Especialidad) => { setEditando(e); setNombre(e.nombre); setError(''); setModal('editar'); };
+  // Limpiar `editando` importa: el chequeo de duplicados lo usa para excluir la fila en edición
+  const openCrear = () => {
+    setEditando(null); setNombre(''); setError(''); setErrorNombre(''); setModal('crear');
+  };
+  const openEditar = (e: Especialidad) => {
+    setEditando(e); setNombre(e.nombre); setError(''); setErrorNombre(''); setModal('editar');
+  };
+
+  // Formato + duplicado contra el catálogo ya cargado (ignora el que se está editando).
+  // "Cardiología" y "cardiologia" cuentan como la misma.
+  const validarNombreEsp = (valor: string): string => {
+    const formato = validarEspecialidad(valor);
+    if (formato) return formato;
+    const repetida = (especialidades ?? []).some(
+      e => e.id !== editando?.id && normalizar(e.nombre) === normalizar(valor),
+    );
+    return repetida ? 'Ya existe una especialidad con ese nombre' : '';
+  };
 
   const handleGuardar = async () => {
-    if (!nombre.trim()) return setError('El nombre es obligatorio');
+    const msg = validarNombreEsp(nombre);
+    setErrorNombre(msg);
+    if (msg) return;
     setError('');
     try {
       if (modal === 'crear') {
-        await crear.mutateAsync(nombre.trim());
+        await crear.mutateAsync(limpiar(nombre));
         toast.success('Especialidad creada');
       } else if (editando) {
-        await actualizar.mutateAsync({ id: editando.id, nombre: nombre.trim() });
+        await actualizar.mutateAsync({ id: editando.id, nombre: limpiar(nombre) });
         toast.success('Especialidad actualizada');
       }
       setModal(null);
@@ -49,8 +69,8 @@ export default function AdminEspecialidades() {
       await eliminar.mutateAsync(eliminando.id);
       toast.success('Especialidad eliminada');
       setEliminando(null);
-    } catch {
-      toast.error('No se pudo eliminar. Puede tener médicos asignados.');
+    } catch (e) {
+      toast.error(apiError(e, 'No se pudo eliminar la especialidad'));
     }
   };
 
@@ -153,7 +173,10 @@ export default function AdminEspecialidades() {
             label="Nombre"
             required
             value={nombre}
-            onChange={e => setNombre(e.target.value)}
+            error={errorNombre}
+            maxLength={LIMITES.especialidad}
+            onChange={e => { setNombre(e.target.value); setErrorNombre(''); }}
+            onBlur={e => setErrorNombre(validarNombreEsp(e.target.value))}
             autoFocus
             placeholder="Ej.: Cardiología"
             onKeyDown={e => e.key === 'Enter' && handleGuardar()}

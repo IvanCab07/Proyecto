@@ -2,10 +2,48 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0B1B1A" />
-    <title>Hospital — Turnos y gestión de salud</title>
+
+    <!-- El nombre también vive en src/ui/Logo.tsx (constante MARCA): cambialo en los dos. -->
+    <title>Vitalis — Turnos y gestión de salud</title>
+    <meta
+      name="description"
+      content="Sacá turnos con el especialista que necesitás, consultá tus recetas y guardá tus estudios médicos. Todo en un solo lugar."
+    />
+
+    <!-- Íconos. El SVG lo usan los navegadores de escritorio; el PNG, iOS al agregar la app
+         a la pantalla de inicio. Los dos los genera `npm run favicon` desde src/ui/Logo.tsx. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#2C5F4E" />
+
+    <!-- Cómo se ve el link cuando alguien lo comparte por WhatsApp, Slack o redes. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Vitalis" />
+    <meta property="og:title" content="Vitalis — Turnos y gestión de salud" />
+    <meta
+      property="og:description"
+      content="Sacá turnos, consultá tus recetas y guardá tus estudios médicos en un solo lugar."
+    />
+    <meta property="og:image" content="/apple-touch-icon.png" />
+    <meta property="og:locale" content="es_AR" />
+    <meta name="twitter:card" content="summary" />
+    <script>
+      // Aplica el tema antes de pintar para que no haya destello blanco al recargar.
+      (function () {
+        try {
+          var saved = JSON.parse(localStorage.getItem('hospital-theme') || 'null');
+          var theme = saved && saved.state && saved.state.theme;
+          if (theme !== 'light' && theme !== 'dark') {
+            theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          document.documentElement.classList.toggle('dark', theme === 'dark');
+        } catch (e) {
+          /* sin localStorage: queda el tema claro por defecto */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

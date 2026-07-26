@@ -6,6 +6,9 @@ import { authenticator } from 'otplib';
 import QRCode from 'qrcode';
 import { prisma } from '../lib/prisma';
 import { HttpError, formatZodError } from '../lib/httpError';
+import {
+  nombreSchema, dniSchema, telefonoOpcionalSchema, emailSchema, passwordSchema,
+} from '../lib/validaciones';
 import { createToken, consumeToken } from '../lib/tokens';
 import { sendMail, verifyEmailTemplate, resetPasswordTemplate } from '../lib/mailer';
 import { WEB_URL } from '../config/env';
@@ -18,14 +21,16 @@ const USER_PUBLIC = {
 } as const;
 
 const registerSchema = z.object({
-  email:    z.string().email(),
-  password: z.string().min(6),
-  nombre:   z.string().min(2),
-  apellido: z.string().min(2),
-  dni:      z.string().min(7).max(11),
-  telefono: z.string().optional(),
+  email:    emailSchema,
+  password: passwordSchema,
+  nombre:   nombreSchema,
+  apellido: nombreSchema,
+  dni:      dniSchema,
+  telefono: telefonoOpcionalSchema,
 });
 
+// El login no valida el formato de la contraseña: las cuentas viejas pueden tener una que
+// hoy no pasaría el schema y no hay que dejarlas afuera.
 const loginSchema = z.object({
   email:    z.string().email(),
   password: z.string().min(1),
@@ -121,14 +126,14 @@ export const me = async (req: Request, res: Response) => {
 };
 
 const perfilSchema = z.object({
-  nombre:   z.string().min(2).optional(),
-  apellido: z.string().min(2).optional(),
-  telefono: z.string().optional(),
+  nombre:   nombreSchema.optional(),
+  apellido: nombreSchema.optional(),
+  telefono: telefonoOpcionalSchema,
 });
 
 const cambiarPasswordSchema = z.object({
   passwordActual: z.string().min(1),
-  passwordNueva:  z.string().min(6),
+  passwordNueva:  passwordSchema,
 });
 
 export const actualizarPerfil = async (req: Request, res: Response) => {
@@ -227,7 +232,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
 const resetSchema = z.object({
   token:    z.string().min(10),
-  password: z.string().min(6),
+  password: passwordSchema,
 });
 
 export const resetPassword = async (req: Request, res: Response) => {

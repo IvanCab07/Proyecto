@@ -225,3 +225,27 @@ export const IconChevronsUpDown = (p: IconProps) => (
 export const IconIdCard = (p: IconProps) => (
   <Icon {...p}><path d="M3 7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" /><path d="M7 10a1.5 1.5 0 103 0 1.5 1.5 0 00-3 0zM6.5 16a2.5 2.5 0 015 0M14 9.5h4M14 13h4M14 16h2.5" /></Icon>
 );
+
+export const IconSun = (p: IconProps) => (
+  <Icon {...p}><path d="M12 3v1.5M12 19.5V21M4.22 4.22l1.06 1.06M18.72 18.72l1.06 1.06M3 12h1.5M19.5 12H21M4.22 19.78l1.06-1.06M18.72 5.28l1.06-1.06" /><path d="M16.5 12a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" /></Icon>
+);
+
+export const IconMoon = (p: IconProps) => (
+  <Icon {...p}><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z" /></Icon>
+);
+
+export const IconChevronsLeft = (p: IconProps) => (
+  <Icon {...p}><path d="M11 17l-5-5 5-5M18 17l-5-5 5-5" /></Icon>
+);
+
+export const IconPrinter = (p: IconProps) => (
+  <Icon {...p}><path d="M7 8V4a1 1 0 011-1h8a1 1 0 011 1v4M7 18H5a2 2 0 01-2-2v-5a2 2 0 012-2h14a2 2 0 012 2v5a2 2 0 01-2 2h-2" /><path d="M7 15h10v5a1 1 0 01-1 1H8a1 1 0 01-1-1v-5z" /></Icon>
+);
+
+export const IconChat = (p: IconProps) => (
+  <Icon {...p}><path d="M21 11.5a8.5 8.5 0 01-9.1 8.48 8.4 8.4 0 01-3.4-.88L3 21l1.9-5.5a8.4 8.4 0 01-.9-3.8 8.5 8.5 0 018.48-9.1A8.5 8.5 0 0121 11.5z" /></Icon>
+);
+
+export const IconSend = (p: IconProps) => (
+  <Icon {...p}><path d="M21.5 12L3 4l3.5 8L3 20l18.5-8zM6.5 12h15" /></Icon>
+);

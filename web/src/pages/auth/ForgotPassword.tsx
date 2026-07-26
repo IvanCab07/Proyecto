@@ -4,19 +4,25 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { authService } from '../../services';
 import { apiError } from '../../lib/apiError';
-import { AuthLayout, AUTH_FEATURES } from './AuthLayout';
+import { useFormulario } from '../../lib/useFormulario';
+import { LIMITES, validarEmail } from '../../lib/validaciones';
+import { AuthLayout } from './AuthLayout';
 import { Input, Button } from '../../ui';
 import { IconAlert, IconArrowRight, IconMail } from '../../ui/icons';
 
 export default function ForgotPassword() {
-  const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const { valores, campo, validarTodo } = useFormulario({ email: '' }, { email: validarEmail });
+  const email = valores.email.trim();
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+    if (!validarTodo()) return;
+
     setLoading(true);
     try {
       await authService.forgotPassword(email);
@@ -32,7 +38,7 @@ export default function ForgotPassword() {
     <AuthLayout
       headline={<>Recuperá tu <em className="not-italic text-brand-300">acceso</em>.</>}
       tagline="Te enviamos un enlace seguro a tu email para que elijas una contraseña nueva."
-      features={AUTH_FEATURES}
+      image="recovery"
     >
       {sent ? (
         <div className="text-center">
@@ -53,16 +59,16 @@ export default function ForgotPassword() {
           <h2 className="text-2xl font-bold tracking-tighter2 text-slate-900">¿Olvidaste tu contraseña?</h2>
           <p className="text-sm text-slate-500 mt-1.5 mb-8">Ingresá tu email y te mandamos un enlace para recuperarla.</p>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
             <Input
               label="Email"
               type="email"
               required
               autoFocus
+              maxLength={LIMITES.email}
               autoComplete="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
               placeholder="tu@email.com"
+              {...campo('email')}
             />
 
             <AnimatePresence initial={false}>

@@ -125,7 +125,7 @@ async function main() {
   });
   await prisma.medico.update({ where: { id: drGarcia.id }, data: { userId: medicoUser.id } });
 
-  const pacienteHash = await bcrypt.hash('test123', 12);
+  const pacienteHash = await bcrypt.hash('test1234', 12);
   const paciente = await prisma.user.upsert({
     where: { email: 'paciente@test.com' },
     update: {},
@@ -161,8 +161,8 @@ async function main() {
   console.log('  admin@admin.com / admin123      (admin)');
   console.log('  admin@hospital.com / admin123   (admin)');
   console.log('  medico@hospital.com / medico123 (médico)');
-  console.log('  paciente@test.com / test123     (paciente)');
-  console.log('  paciente2@test.com / test123    (paciente, para sobreturnos)');
+  console.log('  paciente@test.com / test1234     (paciente)');
+  console.log('  paciente2@test.com / test1234    (paciente, para sobreturnos)');
 
   // Solo crear turnos de ejemplo si el paciente no tiene ninguno aún
   const turnosExistentes = await prisma.turno.count({ where: { pacienteId: paciente.id } });
@@ -182,10 +182,20 @@ async function main() {
       ],
     });
 
+    // Una receta de cada estado, para poder ver los tres badges y los filtros sin cargar
+    // datos a mano. El vencimiento se ancla al mediodía, igual que backend/src/lib/fechas.ts.
+    const vence = (dias: number) => {
+      const d = new Date(hoy);
+      d.setDate(hoy.getDate() + dias);
+      d.setHours(12, 0, 0, 0);
+      return d;
+    };
+
     await prisma.receta.createMany({
       data: [
-        { pacienteId: paciente.id, medicoId: drGarcia.id,   medicamento: 'Ibuprofeno 400mg',   dosis: '1 comprimido cada 8 horas',   indicacion: 'Tomar después de las comidas durante 5 días' },
-        { pacienteId: paciente.id, medicoId: drMartinez.id, medicamento: 'Amoxicilina 500mg',  dosis: '1 cápsula cada 12 horas',      indicacion: 'Completar el tratamiento de 7 días. No suspender.' },
+        { pacienteId: paciente.id, medicoId: drGarcia.id,   medicamento: 'Ibuprofeno 400mg',   dosis: '1 comprimido cada 8 horas', indicacion: 'Tomar después de las comidas durante 5 días',      validoHasta: vence(25) },
+        { pacienteId: paciente.id, medicoId: drMartinez.id, medicamento: 'Amoxicilina 500mg',  dosis: '1 cápsula cada 12 horas',   indicacion: 'Completar el tratamiento de 7 días. No suspender.', validoHasta: vence(4) },
+        { pacienteId: paciente.id, medicoId: drGarcia.id,   medicamento: 'Loratadina 10mg',    dosis: '1 comprimido por día',      indicacion: 'Tomar por la mañana mientras dure la alergia.',     validoHasta: vence(-10), fechaEmision: vence(-40) },
       ],
     });
 

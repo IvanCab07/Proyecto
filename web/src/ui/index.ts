@@ -1,9 +1,12 @@
 export { Button } from './Button';
 export { Card } from './Card';
 export { Field, Input, PasswordInput, Select, Textarea } from './Field';
+export { PasswordStrength } from './PasswordStrength';
 export { SearchInput } from './SearchInput';
 export { Dialog } from './Dialog';
 export { ConfirmDialog } from './ConfirmDialog';
+export { AlertInline } from './AlertInline';
+export { Calendario } from './Calendario';
 export { Menu } from './Menu';
 export type { MenuItem } from './Menu';
 export { Tabs } from './Tabs';
@@ -16,6 +19,7 @@ export { Skeleton, SkeletonText, SkeletonTable, SkeletonStatCard, SkeletonChart,
 export { StatCard } from './StatCard';
 export { AppToaster } from './Toast';
 export { Avatar } from './Avatar';
+export { Logo, LogoBadge, LogoWordmark, MARCA } from './Logo';
 export { PageHeader } from './PageHeader';
 export { Stepper } from './Stepper';
 export { Spinner } from './Spinner';

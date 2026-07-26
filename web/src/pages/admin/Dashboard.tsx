@@ -12,12 +12,13 @@ import {
   IconCalendar, IconClock, IconCheck, IconX, IconUsers, IconChart, IconStethoscope, IconGrid,
 } from '../../ui/icons';
 import { listContainer, listItem, EASE } from '../../lib/motion';
-import { CHART, tooltipStyle, axisTickStyle } from '../../lib/chartTheme';
+import { useChartTheme } from '../../lib/chartTheme';
 
 export default function AdminDashboard() {
   const user = useAuthStore(s => s.user);
   const navigate = useNavigate();
   const { data: stats, isLoading } = useAdminStats();
+  const { brand, axis, cursorFill, tooltipStyle, axisTickStyle } = useChartTheme();
 
   const t = stats?.turnos;
 
@@ -35,18 +36,18 @@ export default function AdminDashboard() {
   return (
     <PageTransition>
       {/* Hero */}
-      <div className="relative overflow-hidden rounded-card bg-rail bg-gradient-to-br from-[#0C2422] via-rail to-[#0A1615] text-white p-6 sm:p-7 mb-6">
+      <div className="relative overflow-hidden rounded-card gradient-card text-rail-fg p-6 sm:p-7 mb-6">
         <div
           className="absolute -top-24 -right-16 w-80 h-80 rounded-full opacity-30 pointer-events-none"
-          style={{ background: 'radial-gradient(circle, #14B8A6, transparent 70%)' }}
+          style={{ background: 'radial-gradient(circle, #7BDC93, transparent 70%)' }}
         />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-brand-300 text-sm font-medium">Panel de administración</p>
             <h1 className="text-[26px] sm:text-[30px] font-bold tracking-tighter2 mt-1 leading-tight">Hola, {user?.nombre}</h1>
-            <p className="text-slate-300 text-sm mt-2">Resumen general de la actividad.</p>
+            <p className="text-rail-fg/70 text-sm mt-2">Resumen general de la actividad.</p>
           </div>
-          <Button onClick={() => navigate('/admin/usuarios')} iconLeft={<IconUsers />} className="!bg-white !text-rail hover:!bg-brand-50 shadow-btn">
+          <Button onClick={() => navigate('/admin/usuarios')} iconLeft={<IconUsers />} className="!bg-white !text-rail hover:!bg-white/90 shadow-btn">
             Gestionar usuarios
           </Button>
         </div>
@@ -99,9 +100,9 @@ export default function AdminDashboard() {
                     >
                       <XAxis type="number" tick={axisTickStyle} axisLine={false} tickLine={false} />
                       <YAxis type="category" dataKey="nombre" width={96}
-                        tick={{ fill: '#475569', fontSize: 11 }} axisLine={false} tickLine={false} />
-                      <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'rgb(13 148 136 / 0.06)' }} />
-                      <Bar dataKey="turnos" name="Turnos" fill={CHART.brand} radius={[0, 6, 6, 0]} animationDuration={600} />
+                        tick={{ fill: axis, fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={tooltipStyle} cursor={{ fill: cursorFill }} />
+                      <Bar dataKey="turnos" name="Turnos" fill={brand} radius={[0, 6, 6, 0]} animationDuration={600} />
                     </BarChart>
                   </ResponsiveContainer>
                 )}

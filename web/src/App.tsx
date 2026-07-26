@@ -15,6 +15,7 @@ import VerifyEmail from './pages/auth/VerifyEmail';
 import VerifyOTP from './pages/auth/VerifyOTP';
 
 import AdminDashboard from './pages/admin/Dashboard';
+import AdminTurnos from './pages/admin/Turnos';
 import AdminMedicos from './pages/admin/Medicos';
 import AdminEspecialidades from './pages/admin/Especialidades';
 import AdminUsuarios from './pages/admin/Usuarios';
@@ -24,6 +25,7 @@ import AdminAjustes from './pages/admin/Ajustes';
 
 import MedicoInicio from './pages/medico/Inicio';
 import MedicoAgenda from './pages/medico/Agenda';
+import MedicoTurnos from './pages/medico/Turnos';
 import MedicoPacientes from './pages/medico/Pacientes';
 import MedicoRecetas from './pages/medico/Recetas';
 import MedicoCalificaciones from './pages/medico/Calificaciones';
@@ -66,6 +68,7 @@ function AppRouter() {
       <Route path="/verify-otp"      element={<VerifyOTP />} />
 
       <Route path="/admin/dashboard"      element={<ProtectedRoute role="ADMIN"><AdminDashboard /></ProtectedRoute>} />
+      <Route path="/admin/turnos"         element={<ProtectedRoute role="ADMIN"><AdminTurnos /></ProtectedRoute>} />
       <Route path="/admin/medicos"        element={<ProtectedRoute role="ADMIN"><AdminMedicos /></ProtectedRoute>} />
       <Route path="/admin/especialidades" element={<ProtectedRoute role="ADMIN"><AdminEspecialidades /></ProtectedRoute>} />
       <Route path="/admin/usuarios"       element={<ProtectedRoute role="ADMIN"><AdminUsuarios /></ProtectedRoute>} />
@@ -75,6 +78,7 @@ function AppRouter() {
 
       <Route path="/medico/inicio"        element={<ProtectedRoute role="MEDICO"><MedicoInicio /></ProtectedRoute>} />
       <Route path="/medico/agenda"        element={<ProtectedRoute role="MEDICO"><MedicoAgenda /></ProtectedRoute>} />
+      <Route path="/medico/turnos"        element={<ProtectedRoute role="MEDICO"><MedicoTurnos /></ProtectedRoute>} />
       <Route path="/medico/pacientes"     element={<ProtectedRoute role="MEDICO"><MedicoPacientes /></ProtectedRoute>} />
       <Route path="/medico/recetas"       element={<ProtectedRoute role="MEDICO"><MedicoRecetas /></ProtectedRoute>} />
       <Route path="/medico/calificaciones" element={<ProtectedRoute role="MEDICO"><MedicoCalificaciones /></ProtectedRoute>} />

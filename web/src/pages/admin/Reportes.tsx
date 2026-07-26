@@ -4,11 +4,12 @@ import { useAdminStats } from '../../hooks';
 import { PageTransition } from '../../components/PageTransition';
 import { TrendChart } from '../../components/TrendChart';
 import { Card, PageHeader, SkeletonChart, Table, THead, TH, TBody, TR, TD } from '../../ui';
-import { CHART, tooltipStyle } from '../../lib/chartTheme';
+import { useChartTheme } from '../../lib/chartTheme';
 import { EASE } from '../../lib/motion';
 
 export default function AdminReportes() {
   const { data: stats, isLoading } = useAdminStats();
+  const { status, tooltipStyle } = useChartTheme();
 
   if (isLoading) {
     return (
@@ -38,10 +39,10 @@ export default function AdminReportes() {
   ];
 
   const estados = [
-    { name: 'Completados', value: t.completados, color: CHART.status.COMPLETADO },
-    { name: 'Confirmados', value: t.confirmados, color: CHART.status.CONFIRMADO },
-    { name: 'Pendientes',  value: t.pendientes,  color: CHART.status.PENDIENTE },
-    { name: 'Cancelados',  value: t.cancelados,  color: CHART.status.CANCELADO },
+    { name: 'Completados', value: t.completados, color: status.COMPLETADO },
+    { name: 'Confirmados', value: t.confirmados, color: status.CONFIRMADO },
+    { name: 'Pendientes',  value: t.pendientes,  color: status.PENDIENTE },
+    { name: 'Cancelados',  value: t.cancelados,  color: status.CANCELADO },
   ].map(e => ({ ...e, pct: pct(e.value) }));
   const pieData = estados.filter(e => e.value > 0);
 

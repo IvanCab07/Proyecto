@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { HttpError, formatZodError } from '../lib/httpError';
+import { fichaDelMedico } from '../lib/medicoPaciente';
+import { ratingsPorMedico, redondearPromedio, SIN_RATING } from '../lib/ratings';
 import { notify } from '../services/notifications.service';
 
 const calificacionSchema = z.object({
@@ -63,7 +65,7 @@ export const crearCalificacion = async (req: Request, res: Response) => {
       'TURNO_COMPLETADO',
       'Nueva calificación',
       `Un paciente calificó tu atención con ${estrellas} ${estrellas === 1 ? 'estrella' : 'estrellas'}.`,
-      { link: '/medico/perfil', data: { turnoId } },
+      { link: '/medico/calificaciones', data: { turnoId } },
     );
   }
 
@@ -72,50 +74,43 @@ export const crearCalificacion = async (req: Request, res: Response) => {
 
 // Admin: todas las calificaciones + promedio de estrellas por médico.
 export const getCalificaciones = async (_req: Request, res: Response) => {
-  const calificaciones = await prisma.calificacion.findMany({
-    include: {
-      paciente: { select: { id: true, nombre: true, apellido: true, dni: true } },
-      medico: { select: { id: true, nombre: true, apellido: true, especialidad: { select: { nombre: true } } } },
-      turno: { select: { id: true, fecha: true, hora: true } },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
+  const [calificaciones, medicos] = await Promise.all([
+    prisma.calificacion.findMany({
+      include: {
+        paciente: { select: { id: true, nombre: true, apellido: true, dni: true } },
+        medico: { select: { id: true, nombre: true, apellido: true, especialidad: { select: { nombre: true } } } },
+        turno: { select: { id: true, fecha: true, hora: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    // Se parte del listado completo de médicos (y no de la tabla de calificaciones) para que
+    // los que todavía no tienen ninguna reseña también aparezcan, con 0 en vez de desaparecer.
+    prisma.medico.findMany({
+      select: { id: true, nombre: true, apellido: true, especialidad: { select: { nombre: true } } },
+    }),
+  ]);
 
-  // Promedio y cantidad por médico (Prisma groupBy con avg)
-  const grupos = await prisma.calificacion.groupBy({
-    by: ['medicoId'],
-    _avg: { estrellas: true },
-    _count: { _all: true },
-  });
+  const ratings = await ratingsPorMedico(medicos.map(m => m.id));
 
-  const medicos = await prisma.medico.findMany({
-    where: { id: { in: grupos.map(g => g.medicoId) } },
-    select: { id: true, nombre: true, apellido: true, especialidad: { select: { nombre: true } } },
-  });
-  const medicoById = new Map(medicos.map(m => [m.id, m]));
-
-  const promediosPorMedico = grupos
-    .map(g => {
-      const m = medicoById.get(g.medicoId);
-      return {
-        medicoId: g.medicoId,
-        nombre: m ? `Dr. ${m.apellido}, ${m.nombre}` : 'Médico',
-        especialidad: m?.especialidad.nombre ?? '',
-        promedio: Math.round((g._avg.estrellas ?? 0) * 10) / 10,
-        cantidad: g._count._all,
-      };
-    })
-    .sort((a, b) => b.promedio - a.promedio);
+  const promediosPorMedico = medicos
+    .map(m => ({
+      medicoId: m.id,
+      nombre: `Dr. ${m.apellido}, ${m.nombre}`,
+      especialidad: m.especialidad.nombre,
+      ...(ratings.get(m.id) ?? SIN_RATING),
+    }))
+    // A igual promedio va primero el que tiene más reseñas: un 5.0 con una sola reseña
+    // no debería superar a un 4.9 con cincuenta.
+    .sort((a, b) => b.promedio - a.promedio || b.cantidad - a.cantidad);
 
   return res.json({ calificaciones, promediosPorMedico });
 };
 
-// Médico: calificaciones que recibió (para su perfil).
+// Médico: calificaciones que recibió, con las métricas de su panel.
 export const getMisCalificaciones = async (req: Request, res: Response) => {
-  const medico = await prisma.medico.findUnique({ where: { userId: req.user!.userId } });
-  if (!medico) throw new HttpError(403, 'Tu cuenta no está vinculada a una ficha de médico');
+  const medico = await fichaDelMedico(req.user!.userId);
 
-  const [calificaciones, agg] = await Promise.all([
+  const [calificaciones, agg, porEstrella, atendidos] = await Promise.all([
     prisma.calificacion.findMany({
       where: { medicoId: medico.id },
       include: {
@@ -129,11 +124,29 @@ export const getMisCalificaciones = async (req: Request, res: Response) => {
       _avg: { estrellas: true },
       _count: { _all: true },
     }),
+    // Cuántas reseñas hay de cada puntaje, para el gráfico de distribución
+    prisma.calificacion.groupBy({
+      by: ['estrellas'],
+      where: { medicoId: medico.id },
+      _count: { _all: true },
+    }),
+    // Consultas efectivamente realizadas: la base sobre la que se mide la tasa de respuesta
+    prisma.turno.count({ where: { medicoId: medico.id, status: 'COMPLETADO' } }),
   ]);
+
+  // Los 5 tramos siempre presentes (con 0 si nadie puso ese puntaje), así el gráfico no se deforma
+  const distribucion: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  for (const g of porEstrella) distribucion[g.estrellas] = g._count._all;
+
+  const cantidad = agg._count._all;
 
   return res.json({
     calificaciones,
-    promedio: Math.round((agg._avg.estrellas ?? 0) * 10) / 10,
-    cantidad: agg._count._all,
+    promedio: redondearPromedio(agg._avg.estrellas),
+    cantidad,
+    distribucion,
+    atendidos,
+    // Porcentaje de consultas completadas que terminaron en reseña
+    tasaRespuesta: atendidos ? Math.round((cantidad / atendidos) * 100) : 0,
   });
 };

@@ -59,6 +59,11 @@ model User {
   role         Role     @default(PATIENT)       // Rol (por defecto es paciente)
   activo       Boolean  @default(true)          // Si la cuenta está habilitada para ingresar
 
+  // ── Baja de la cuenta ──
+  // Se completan cuando el admin la da de baja y se limpian al reactivarla.
+  motivoBaja    String?                         // Por qué se dio de baja (lo escribe el admin)
+  desactivadoAt DateTime?                       // Cuándo se dio de baja
+
   // ── Seguridad de cuenta ──
   emailVerified    Boolean @default(false)      // Si el email fue confirmado por el usuario
   twoFactorEnabled Boolean @default(false)      // Si activó la verificación en dos pasos (2FA)
@@ -74,6 +79,9 @@ model User {
   turnos       Turno[]
   estudios     Estudio[]
   recetas      Receta[]
+
+  // Estudios que este usuario subió (los propios, o los que un médico cargó para un paciente)
+  estudiosSubidos Estudio[] @relation("EstudiosSubidos")
 
   // Calificaciones que dejó este paciente
   calificaciones Calificacion[]
@@ -222,7 +230,8 @@ model Calificacion {
 // Archivos de estudios médicos que sube el paciente (PDFs, imágenes).
 model Estudio {
   id          String   @id @default(uuid())
-  pacienteId  String
+  pacienteId  String                                // De quién es el estudio
+  subidoPorId String?                               // Quién lo subió (null = histórico previo a este campo)
   titulo      String                                // Nombre del estudio
   descripcion String?                               // Descripción opcional
   archivoUrl  String                                // Ruta al archivo guardado
@@ -231,6 +240,8 @@ model Estudio {
   createdAt   DateTime @default(now())
 
   paciente    User     @relation(fields: [pacienteId], references: [id])
+  // Si se elimina la cuenta que lo subió, el estudio queda igual pero sin autor
+  subidoPor   User?    @relation("EstudiosSubidos", fields: [subidoPorId], references: [id], onDelete: SetNull)
 
   @@map("estudios")
 }
@@ -245,7 +256,10 @@ model Receta {
   dosis        String                               // Dosis (ej: "500mg cada 8hs")
   indicacion   String                               // Indicaciones especiales
   fechaEmision DateTime @default(now())             // Fecha en que se emitió
-  validoHasta  DateTime?                            // Fecha de vencimiento (opcional)
+  // Vencimiento obligatorio: una receta sin fecha no vencía nunca y el paciente no tenía
+  // forma de saber si todavía servía. Si el emisor no la manda, el controller la completa
+  // con fechaEmision + VALIDEZ_POR_DEFECTO_DIAS.
+  validoHasta  DateTime
   createdAt    DateTime @default(now())
 
   paciente     User     @relation(fields: [pacienteId], references: [id])

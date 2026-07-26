@@ -2,6 +2,9 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { HttpError, formatZodError } from '../lib/httpError';
+import {
+  ESTADOS_ABIERTOS, ETIQUETAS, esReversion, puedeTransicionar, type TurnoStatus,
+} from '../lib/turnoEstados';
 import { notify, notifyAdmins } from '../services/notifications.service';
 
 // Fecha corta dd/mm/yyyy para los mensajes de notificación
@@ -20,7 +23,7 @@ const turnoSchema = z.object({
 const turnoStatusEnum = z.enum(['PENDIENTE', 'CONFIRMADO', 'CANCELADO', 'COMPLETADO', 'EN_ESPERA', 'AUSENTE']);
 
 // Estados que "ocupan" el horario (un turno activo). Si uno de estos se libera, se cede el sobreturno.
-const ESTADOS_OCUPAN = ['PENDIENTE', 'CONFIRMADO'] as const;
+const ESTADOS_OCUPAN: readonly TurnoStatus[] = ESTADOS_ABIERTOS;
 
 // Límites del día (00:00 a 23:59:59) de una fecha, para buscar por día sin importar la hora exacta guardada.
 function rangoDelDia(fecha: Date): { gte: Date; lte: Date } {
@@ -167,7 +170,8 @@ export const getAllTurnos = async (req: Request, res: Response) => {
 
       ...(statusParsed.success && { status: statusParsed.data }),
 
-      ...(fechaValida && { fecha: fechaDate }),
+      // Por día completo: comparar contra el timestamp exacto nunca coincidía
+      ...(fechaValida && { fecha: rangoDelDia(fechaDate!) }),
     },
     include: {
 
@@ -214,21 +218,60 @@ export const updateTurnoStatus = async (req: Request, res: Response) => {
   }
   const { status, notas, diagnostico } = result.data;
 
+  const previo = await prisma.turno.findUnique({
+    where: { id },
+    select: { status: true, medicoId: true, fecha: true, hora: true, calificacion: { select: { id: true } } },
+  });
+  if (!previo) throw new HttpError(404, 'Turno no encontrado');
+
   // Un médico solo puede tocar sus propios turnos; el admin, cualquiera
   if (req.user!.role === 'MEDICO') {
     const medicoId = await medicoIdDeUsuario(req.user!.userId);
-    const propio = await prisma.turno.findUnique({ where: { id } });
-    if (!propio || propio.medicoId !== medicoId) {
+    if (previo.medicoId !== medicoId) {
       throw new HttpError(403, 'Ese turno no pertenece a tu agenda');
     }
   }
 
+  const desde = previo.status as TurnoStatus;
+
+  // Sin cambio real: no reescribimos ni volvemos a notificar al paciente
+  if (desde === status && notas === undefined && diagnostico === undefined) {
+    return res.json(await prisma.turno.findUnique({ where: { id } }));
+  }
+
+  if (desde !== status) {
+    if (!puedeTransicionar(desde, status)) {
+      throw new HttpError(400, `No se puede pasar un turno de ${ETIQUETAS[desde]} a ${ETIQUETAS[status]}`);
+    }
+
+    // Deshacer un turno cerrado exige que nada dependa todavía de ese cierre
+    if (esReversion(desde, status)) {
+      if (previo.calificacion) {
+        throw new HttpError(409, 'Ese turno ya fue calificado por el paciente. No se puede deshacer.');
+      }
+
+      // Al volver a ocupar el horario hay que asegurarse de que no lo haya tomado otro turno
+      // (por ejemplo, un sobreturno que se cedió justo cuando este se canceló).
+      const ocupado = await prisma.turno.findFirst({
+        where: {
+          id: { not: id },
+          medicoId: previo.medicoId,
+          hora: previo.hora,
+          fecha: rangoDelDia(previo.fecha),
+          status: { in: [...ESTADOS_OCUPAN] },
+        },
+        select: { id: true },
+      });
+      if (ocupado) {
+        throw new HttpError(409, 'Ya hay otro turno ocupando ese horario. Reprogramalo antes de deshacer este.');
+      }
+    }
+  }
+
   // Si el turno ocupaba el horario y ahora se libera (cancelado/ausente), después habrá que ceder el sobreturno.
-  const previo = await prisma.turno.findUnique({ where: { id }, select: { status: true } });
   const liberaHorario =
-    !!previo &&
     (status === 'CANCELADO' || status === 'AUSENTE') &&
-    (ESTADOS_OCUPAN as readonly string[]).includes(previo.status);
+    (ESTADOS_OCUPAN as readonly string[]).includes(desde);
 
   const turno = await prisma.turno.update({
     where: { id },
@@ -239,21 +282,28 @@ export const updateTurnoStatus = async (req: Request, res: Response) => {
     },
   });
 
-  // Avisar al paciente según el nuevo estado de su turno
+  // Avisar al paciente, pero solo si el estado cambió de verdad: guardar únicamente
+  // notas o diagnóstico no es algo que tenga que notificarse.
   const fechaTxt = `${fechaCorta(turno.fecha)} a las ${turno.hora}`;
   const ctx = { link: '/paciente/turnos', data: { turnoId: turno.id } };
-  if (turno.status === 'CONFIRMADO') {
-    await notify(turno.pacienteId, 'TURNO_CONFIRMADO', 'Turno confirmado',
-      `Tu turno del ${fechaTxt} fue confirmado.`, { ...ctx, email: true });
-  } else if (turno.status === 'CANCELADO') {
-    await notify(turno.pacienteId, 'TURNO_CANCELADO', 'Turno cancelado',
-      `Tu turno del ${fechaTxt} fue cancelado.`, { ...ctx, email: true });
-  } else if (turno.status === 'AUSENTE') {
-    await notify(turno.pacienteId, 'TURNO_CANCELADO', 'Turno marcado como ausente',
-      `Tu turno del ${fechaTxt} se marcó como ausente (no asististe).`, ctx);
-  } else if (turno.status === 'COMPLETADO') {
-    await notify(turno.pacienteId, 'TURNO_COMPLETADO', 'Consulta completada',
-      `Tu turno del ${fechaTxt} se marcó como completado.`, ctx);
+  if (desde !== status) {
+    if (esReversion(desde, status)) {
+      // El médico deshizo el estado: avisamos para que el paciente no quede con la info vieja
+      await notify(turno.pacienteId, 'TURNO_CONFIRMADO', 'Se corrigió el estado de tu turno',
+        `Tu turno del ${fechaTxt} volvió a estado ${ETIQUETAS[status]}.`, ctx);
+    } else if (turno.status === 'CONFIRMADO') {
+      await notify(turno.pacienteId, 'TURNO_CONFIRMADO', 'Turno confirmado',
+        `Tu turno del ${fechaTxt} fue confirmado.`, { ...ctx, email: true });
+    } else if (turno.status === 'CANCELADO') {
+      await notify(turno.pacienteId, 'TURNO_CANCELADO', 'Turno cancelado',
+        `Tu turno del ${fechaTxt} fue cancelado.`, { ...ctx, email: true });
+    } else if (turno.status === 'AUSENTE') {
+      await notify(turno.pacienteId, 'TURNO_CANCELADO', 'Turno marcado como ausente',
+        `Tu turno del ${fechaTxt} se marcó como ausente (no asististe).`, ctx);
+    } else if (turno.status === 'COMPLETADO') {
+      await notify(turno.pacienteId, 'TURNO_COMPLETADO', 'Consulta completada',
+        `Tu turno del ${fechaTxt} se marcó como completado.`, ctx);
+    }
   }
 
   // Si se liberó el horario, ceder el sobreturno más antiguo en cola.

@@ -92,7 +92,7 @@ El celular y la PC tienen que estar en la misma red WiFi.
 |-----------|----------------------|------------|
 | Admin     | admin@hospital.com   | admin123   |
 | Médico    | medico@hospital.com  | medico123  |
-| Paciente  | paciente@test.com    | test123    |
+| Paciente  | paciente@test.com    | test1234   |
 
 ---
 

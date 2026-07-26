@@ -4,16 +4,24 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../store/useAuthStore';
+import { useSidebarStore } from '../store/useSidebarStore';
 import { useReenviarVerificacion } from '../hooks';
 import { apiError } from '../lib/apiError';
 import { cn } from '../lib/cn';
 import { SPRING, EASE, DUR, overlayFade } from '../lib/motion';
 import { navFor, flatNav } from '../lib/nav';
 import { Avatar } from '../ui/Avatar';
+import { LogoBadge, MARCA } from '../ui/Logo';
 import { Topbar } from './Topbar';
 import { CommandPalette } from './CommandPalette';
 import { ChatSoporte } from './ChatSoporte';
-import { IconLogout, IconX, IconMail } from '../ui/icons';
+import { IconLogout, IconX, IconMail, IconChevronsLeft } from '../ui/icons';
+
+const SUBTITLE: Record<string, string> = {
+  ADMIN: 'Administración',
+  MEDICO: 'Portal médico',
+  PATIENT: 'Portal del paciente',
+};
 
 // Aviso global cuando el usuario todavía no verificó su email
 function VerificationBanner() {
@@ -31,8 +39,8 @@ function VerificationBanner() {
   };
 
   return (
-    <div className="bg-warning-soft border-b border-warning/20 px-5 sm:px-8 xl:px-10 py-2.5">
-      <div className="max-w-7xl mx-auto flex items-center gap-3 text-[13px] text-warning-text">
+    <div className="bg-warning-soft rounded-card ring-1 ring-inset ring-warning/20 px-4 sm:px-5 py-2.5 mb-5">
+      <div className="flex items-center gap-3 text-[13px] text-warning-text">
         <IconMail className="w-4 h-4 shrink-0" />
         <p className="flex-1 font-medium">Verificá tu email para asegurar tu cuenta. Revisá tu casilla o reenviá el correo.</p>
         <button
@@ -47,72 +55,125 @@ function VerificationBanner() {
   );
 }
 
-function Monogram({ className }: { className?: string }) {
-  return (
-    <div
-      className={cn(
-        'w-9 h-9 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 text-white grid place-items-center font-bold text-lg leading-none select-none shrink-0 shadow-glow-brand',
-        className,
-      )}
-      aria-hidden="true"
-    >
-      H<span className="text-brand-100 text-sm">+</span>
-    </div>
-  );
+interface SidebarProps {
+  navId: string;
+  expanded: boolean;
+  onToggle?: () => void;
+  onNavigate?: () => void;
 }
 
-function SidebarContent({ navId, onNavigate }: { navId: string; onNavigate?: () => void }) {
+function SidebarContent({ navId, expanded, onToggle, onNavigate }: SidebarProps) {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const groups = navFor(user?.role);
+  // Los tooltips del rail colapsado se posicionan con `fixed` para que no los
+  // recorte el scroll de la navegación.
+  const [tip, setTip] = useState<{ top: number; label: string } | null>(null);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
+  const showTip = (label: string) => (e: React.MouseEvent<HTMLElement>) => {
+    if (expanded) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    setTip({ top: r.top + r.height / 2, label });
+  };
+  const hideTip = () => setTip(null);
+
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center gap-3 px-5 py-5">
-        <Monogram />
-        <div className="min-w-0">
-          <p className="text-white font-semibold text-sm tracking-tightish leading-tight">Hospital</p>
-          <p className="text-xs text-slate-400 leading-tight">
-            {user?.role === 'ADMIN' ? 'Administración' : 'Portal del paciente'}
-          </p>
-        </div>
+    <div className="flex flex-col h-full min-h-0 text-rail-fg">
+      {/* Marca */}
+      <div className={cn('flex items-center gap-3 px-4 pt-5 pb-4', !expanded && 'justify-center px-0')}>
+        <button
+          type="button"
+          onClick={onToggle}
+          disabled={!onToggle}
+          aria-label={expanded ? 'Colapsar menú' : 'Expandir menú'}
+          onMouseEnter={showTip('Expandir menú')}
+          onMouseLeave={hideTip}
+          className={cn('rounded-2xl transition-transform', onToggle && 'hover:scale-105 cursor-pointer')}
+        >
+          <LogoBadge size="sm" />
+        </button>
+
+        {expanded && (
+          <div className="min-w-0 flex-1">
+            <p className="text-rail-fg font-semibold text-sm tracking-tightish leading-tight">{MARCA}</p>
+            <p className="text-xs text-rail-fg/60 leading-tight truncate">
+              {SUBTITLE[user?.role ?? ''] ?? 'Portal del paciente'}
+            </p>
+          </div>
+        )}
+
+        {expanded && onToggle && (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-label="Colapsar menú"
+            className="grid place-items-center w-8 h-8 rounded-full bg-white/10 text-rail-fg/70 transition-colors hover:bg-white/20 hover:text-rail-fg"
+          >
+            <IconChevronsLeft className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 pb-2">
-        {groups.map(group => (
+      {/* Navegación */}
+      <nav className={cn('flex-1 min-h-0 overflow-y-auto pb-2', expanded ? 'px-3' : 'px-4')}>
+        {groups.map((group, gi) => (
           <div key={group.label}>
-            <p className="px-3 pt-4 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-              {group.label}
-            </p>
-            <div className="space-y-0.5">
+            {expanded ? (
+              <p className="px-3 pt-4 pb-1 text-[11px] font-semibold uppercase tracking-wider text-rail-fg/45">
+                {group.label}
+              </p>
+            ) : (
+              gi > 0 && <div className="mx-auto my-3 h-px w-8 bg-white/10" aria-hidden="true" />
+            )}
+
+            <div className={expanded ? 'space-y-0.5' : 'space-y-2'}>
               {group.items.map(item => (
-                <NavLink key={item.to} to={item.to} onClick={onNavigate} className="block">
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  onClick={onNavigate}
+                  onMouseEnter={showTip(item.label)}
+                  onMouseLeave={hideTip}
+                  className="block"
+                >
                   {({ isActive }) => (
                     <span
                       className={cn(
-                        'group relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-150',
-                        isActive ? 'text-white' : 'text-slate-300 hover:text-white',
+                        'group relative flex items-center transition-colors duration-150',
+                        expanded
+                          ? 'gap-3 px-3 py-2.5 rounded-xl text-sm font-medium'
+                          : 'w-12 h-12 mx-auto justify-center rounded-full',
+                        isActive ? 'text-rail' : 'text-rail-fg/75 hover:text-rail-fg',
                       )}
                     >
-                      {isActive && (
+                      {isActive ? (
                         <motion.span
                           layoutId={navId}
                           transition={SPRING.snappy}
-                          className="absolute inset-0 rounded-lg bg-brand-500/15 ring-1 ring-inset ring-brand-400/25"
+                          className={cn(
+                            'absolute inset-0 bg-mint-grad shadow-glow-mint',
+                            expanded ? 'rounded-xl' : 'rounded-full',
+                          )}
+                        />
+                      ) : (
+                        <span
+                          className={cn(
+                            'absolute inset-0 bg-white/[0.06] transition-colors group-hover:bg-white/[0.14]',
+                            expanded ? 'rounded-xl' : 'rounded-full',
+                          )}
                         />
                       )}
-                      <item.icon
-                        className={cn(
-                          'relative w-[18px] h-[18px] transition-colors',
-                          isActive ? 'text-brand-300' : 'text-slate-400 group-hover:text-slate-200',
-                        )}
-                      />
-                      <span className="relative">{item.label}</span>
+
+                      <item.icon className="relative w-[18px] h-[18px]" />
+                      {expanded && <span className="relative truncate">{item.label}</span>}
+                      {isActive && expanded && (
+                        <span className="active-indicator relative ml-auto w-1.5 h-1.5 rounded-full bg-rail/70" />
+                      )}
                     </span>
                   )}
                 </NavLink>
@@ -122,24 +183,62 @@ function SidebarContent({ navId, onNavigate }: { navId: string; onNavigate?: () 
         ))}
       </nav>
 
-      <div className="px-3 py-4 border-t border-white/10">
-        <div className="flex items-center gap-3 px-2 mb-2">
-          <Avatar nombre={user?.nombre} apellido={user?.apellido} size="sm" />
-          <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-semibold text-white truncate leading-tight">
-              {user?.nombre} {user?.apellido}
-            </p>
-            <p className="text-xs text-slate-400 truncate leading-tight">{user?.email}</p>
-          </div>
+      {/* Usuario */}
+      <div className={cn('pt-3 pb-4 border-t border-white/10', expanded ? 'px-3' : 'px-4')}>
+        <div className={cn('flex items-center gap-3 mb-2', expanded ? 'px-2' : 'justify-center')}>
+          <button
+            type="button"
+            onClick={onToggle}
+            disabled={!onToggle}
+            aria-label={expanded ? 'Colapsar menú' : 'Expandir menú'}
+            onMouseEnter={showTip(`${user?.nombre ?? ''} ${user?.apellido ?? ''}`.trim() || 'Mi cuenta')}
+            onMouseLeave={hideTip}
+            className={cn('rounded-full transition-transform', onToggle && 'hover:scale-105 cursor-pointer')}
+          >
+            <Avatar nombre={user?.nombre} apellido={user?.apellido} size="sm" />
+          </button>
+          {expanded && (
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-semibold text-rail-fg truncate leading-tight">
+                {user?.nombre} {user?.apellido}
+              </p>
+              <p className="text-xs text-rail-fg/60 truncate leading-tight">{user?.email}</p>
+            </div>
+          )}
         </div>
+
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-300 transition-colors duration-150 hover:bg-danger/15 hover:text-red-300"
+          onMouseEnter={showTip('Cerrar sesión')}
+          onMouseLeave={hideTip}
+          aria-label="Cerrar sesión"
+          className={cn(
+            'flex items-center text-sm font-medium text-rail-fg/75 transition-colors duration-150 hover:bg-danger/25 hover:text-white',
+            expanded
+              ? 'w-full gap-3 px-3 py-2.5 rounded-xl'
+              : 'w-12 h-12 mx-auto justify-center rounded-full bg-white/[0.06]',
+          )}
         >
           <IconLogout className="w-[18px] h-[18px] opacity-80" />
-          Cerrar sesión
+          {expanded && 'Cerrar sesión'}
         </button>
       </div>
+
+      {/* Tooltip del rail colapsado */}
+      <AnimatePresence>
+        {!expanded && tip && (
+          <motion.div
+            initial={{ opacity: 0, x: -6 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -6 }}
+            transition={{ duration: DUR.fast }}
+            style={{ top: tip.top, left: 'calc(1.5rem + 5rem + 0.75rem)' }}
+            className="fixed z-50 -translate-y-1/2 pointer-events-none whitespace-nowrap rounded-xl bg-rail-soft px-3 py-1.5 text-[13px] font-medium text-rail-fg shadow-pop ring-1 ring-inset ring-white/10"
+          >
+            {tip.label}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -148,17 +247,27 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { user } = useAuthStore();
   const location = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const expanded = useSidebarStore(s => s.expanded);
+  const toggleRail = useSidebarStore(s => s.toggle);
 
   const items = flatNav(navFor(user?.role));
   const pageTitle =
     [...items].sort((a, b) => b.to.length - a.to.length)
-      .find(item => location.pathname.startsWith(item.to))?.label ?? 'Hospital';
+      .find(item => location.pathname.startsWith(item.to))?.label ?? MARCA;
 
   return (
     <div className="flex h-screen overflow-hidden bg-canvas">
-      {/* Rail desktop */}
-      <aside className="hidden lg:flex w-64 shrink-0 flex-col bg-rail bg-rail-grad">
-        <SidebarContent navId="rail-active" />
+      {/* Rail desktop — flotante y colapsable */}
+      <aside className="hidden lg:block shrink-0 py-6 pl-6">
+        <div
+          className={cn(
+            'flex flex-col h-full rounded-rail gradient-sidebar shadow-rail ring-1 ring-inset ring-white/10',
+            'transition-[width] duration-300 ease-in-out',
+            expanded ? 'w-64' : 'w-20',
+          )}
+        >
+          <SidebarContent navId="rail-active" expanded={expanded} onToggle={toggleRail} />
+        </div>
       </aside>
 
       {/* Drawer mobile */}
@@ -170,23 +279,23 @@ export function AppShell({ children }: { children: ReactNode }) {
               initial="hidden"
               animate="visible"
               exit="hidden"
-              className="absolute inset-0 bg-slate-950/50 backdrop-blur-[2px]"
+              className="absolute inset-0 bg-scrim/60 backdrop-blur-[2px]"
               onClick={() => setDrawerOpen(false)}
             />
             <motion.aside
               initial={{ x: '-100%' }}
               animate={{ x: 0, transition: { duration: DUR.slow, ease: EASE.outExpo } }}
               exit={{ x: '-100%', transition: { duration: DUR.base, ease: EASE.in } }}
-              className="absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-rail bg-rail-grad shadow-modal flex flex-col"
+              className="absolute inset-y-0 left-0 w-72 max-w-[85vw] gradient-sidebar shadow-modal flex flex-col"
             >
               <button
                 onClick={() => setDrawerOpen(false)}
                 aria-label="Cerrar menú"
-                className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                className="absolute top-5 right-4 z-10 p-1.5 rounded-full bg-white/10 text-rail-fg/70 hover:text-rail-fg hover:bg-white/20 transition-colors"
               >
                 <IconX />
               </button>
-              <SidebarContent navId="drawer-active" onNavigate={() => setDrawerOpen(false)} />
+              <SidebarContent navId="drawer-active" expanded onNavigate={() => setDrawerOpen(false)} />
             </motion.aside>
           </div>
         )}
@@ -196,8 +305,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Topbar title={pageTitle} onOpenDrawer={() => setDrawerOpen(true)} />
         <main className="flex-1 overflow-y-auto">
-          <VerificationBanner />
-          <div className="max-w-7xl mx-auto p-5 sm:p-8 xl:px-10">{children}</div>
+          <div className="max-w-7xl mx-auto p-5 pt-2 sm:p-8 sm:pt-3 xl:px-10">
+            <VerificationBanner />
+            {children}
+          </div>
         </main>
       </div>
 

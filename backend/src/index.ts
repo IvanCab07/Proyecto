@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import qrcode from 'qrcode-terminal';
 import { ZodError } from 'zod';
+import { MulterError } from 'multer';
 import { Prisma } from '@prisma/client';
 
 import { PORT } from './config/env';
@@ -55,6 +56,13 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
   // Error con status explícito que lanzamos a propósito
   if (err instanceof HttpError) {
     return res.status(err.status).json({ error: err.message });
+  }
+  // Archivo demasiado grande u otro problema de multer → 413/400, nunca un 500 genérico
+  if (err instanceof MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: 'El archivo supera el máximo de 10 MB' });
+    }
+    return res.status(400).json({ error: 'No se pudo procesar el archivo enviado' });
   }
   // Restricción única de la base (email/DNI/matrícula repetidos) → 409 amable
   if (err instanceof Prisma.PrismaClientKnownRequestError) {

@@ -25,6 +25,11 @@ const LABELS: Record<string, string> = {
   pacienteId: 'El paciente',
   fecha: 'La fecha',
   hora: 'La hora',
+  status: 'El estado',
+  estrellas: 'La puntuación',
+  comentario: 'El comentario',
+  titulo: 'El título',
+  descripcion: 'La descripción',
   medicamento: 'El medicamento',
   dosis: 'La dosis',
   indicacion: 'La indicación',
@@ -58,7 +63,13 @@ function issueMessage(issue: ZodIssue): string {
       if (issue.validation === 'email') return 'El email no tiene un formato válido';
       if (issue.validation === 'uuid') return `${label} no es válido`;
       if (issue.validation === 'datetime') return `${label} no es una fecha válida`;
-      if (issue.validation === 'regex') return `${label} tiene un formato inválido`;
+      // Los .regex() de lib/validaciones.ts traen la frase que sigue a la etiqueta
+      // ("solo puede tener letras..."). Zod usa "Invalid" cuando no se pasó ninguna.
+      if (issue.validation === 'regex') {
+        return issue.message && issue.message !== 'Invalid'
+          ? `${label} ${issue.message}`
+          : `${label} tiene un formato inválido`;
+      }
       return `${label} no es válido`;
     case 'invalid_type':
       return issue.received === 'undefined' ? `${label} es obligatorio` : `${label} no es válido`;

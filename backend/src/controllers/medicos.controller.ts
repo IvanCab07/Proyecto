@@ -2,17 +2,19 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { HttpError, formatZodError } from '../lib/httpError';
+import { nombreSchema, matriculaSchema } from '../lib/validaciones';
+import { conRating } from '../lib/ratings';
 
 const medicoSchema = z.object({
-  nombre:        z.string().min(2),
-  apellido:      z.string().min(2),
-  matricula:     z.string().min(4),
+  nombre:        nombreSchema,
+  apellido:      nombreSchema,
+  matricula:     matriculaSchema,
   especialidadId: z.string().uuid(),
 });
 
 const actualizarMedicoSchema = z.object({
-  nombre:     z.string().min(2).optional(),
-  apellido:   z.string().min(2).optional(),
+  nombre:     nombreSchema.optional(),
+  apellido:   nombreSchema.optional(),
   disponible: z.boolean().optional(),
 });
 
@@ -20,14 +22,14 @@ const miDisponibilidadSchema = z.object({
   disponible: z.boolean(),
 });
 
-// Pacientes y admins: médicos disponibles
+// Pacientes y admins: médicos disponibles (con su calificación, para poder elegir informado)
 export const getMedicosDisponibles = async (_req: Request, res: Response) => {
   const medicos = await prisma.medico.findMany({
     where: { disponible: true },
     include: { especialidad: true },
     orderBy: { apellido: 'asc' },
   });
-  return res.json(medicos);
+  return res.json(await conRating(medicos));
 };
 
 // Pacientes y admins: médicos disponibles de una especialidad
@@ -35,8 +37,9 @@ export const getMedicosPorEspecialidad = async (req: Request, res: Response) => 
   const medicos = await prisma.medico.findMany({
     where: { especialidadId: req.params.especialidadId, disponible: true },
     include: { especialidad: true },
+    orderBy: { apellido: 'asc' },
   });
-  return res.json(medicos);
+  return res.json(await conRating(medicos));
 };
 
 // Admin: todos los médicos (incluye no disponibles)
@@ -55,12 +58,16 @@ export const crearMedico = async (req: Request, res: Response) => {
     return res.status(400).json({ error: formatZodError(result.error) });
   }
 
+  // matriculaSchema ya la deja recortada y en mayúsculas
   const { nombre, apellido, matricula, especialidadId } = result.data;
 
   const existente = await prisma.medico.findUnique({ where: { matricula } });
   if (existente) {
     return res.status(409).json({ error: 'Ya existe un médico con esa matrícula' });
   }
+
+  const esp = await prisma.especialidad.findUnique({ where: { id: especialidadId } });
+  if (!esp) throw new HttpError(404, 'La especialidad seleccionada no existe');
 
   const medico = await prisma.medico.create({
     data: { nombre, apellido, matricula, especialidadId },
