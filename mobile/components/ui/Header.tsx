@@ -1,14 +1,20 @@
 import type { ReactNode } from 'react';
 import { View, Text } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { gradients } from '../../lib/theme';
+import { useTheme } from '../../lib/useTheme';
 import { PressableScale } from '../../lib/motion';
 import { IconArrowLeft } from './Icon';
 
-// Hero/encabezado de pantalla con gradiente oscuro (rail) o teal (brand).
+// Encabezado de pantalla: barra clara sobre el lienzo, como el Topbar de la web
+// (web/src/components/Topbar.tsx).
+//
+// Antes era una franja con degradado verde. En la web ese verde vive en el rail lateral, que en
+// mobile no existe, así que acá terminaba ocupando la cabecera de todas las pantallas. Ahora el
+// verde queda como acento —botones, íconos, chips, logo— y el hero verde sobrevive solo donde
+// es la marca y no el chrome: el login (components/AuthHero.tsx) y la pantalla de arranque.
+
 export function ScreenHeader({
-  title, subtitle, eyebrow, right, onBack, children, variant = 'rail', pb,
+  title, subtitle, eyebrow, right, onBack, children,
 }: {
   title?: string;
   subtitle?: string;
@@ -16,30 +22,78 @@ export function ScreenHeader({
   right?: ReactNode;
   onBack?: () => void;
   children?: ReactNode;
-  variant?: 'rail' | 'brand';
-  /** Padding inferior del contenido (px). Subir cuando una tarjeta flota por encima del header. */
-  pb?: number;
 }) {
   const insets = useSafeAreaInsets();
-  const grad = variant === 'brand' ? gradients.brand : gradients.railHero;
   return (
-    <LinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ paddingTop: insets.top + 10 }}>
-      <View className="px-5 pt-1" style={{ paddingBottom: pb ?? 20 }}>
-        <View className="flex-row items-start justify-between">
-          <View className="flex-1">
-            {onBack ? (
-              <PressableScale onPress={onBack} haptic="select" className="w-9 h-9 -ml-1 mb-2 rounded-full items-center justify-center bg-white/10">
-                <IconArrowLeft size={18} color="#fff" />
-              </PressableScale>
-            ) : null}
-            {eyebrow ? <Text className="text-brand-300 text-[11px] font-bold uppercase tracking-widest">{eyebrow}</Text> : null}
-            {title ? <Text className="text-white text-[26px] font-bold mt-0.5" style={{ letterSpacing: -0.5 }}>{title}</Text> : null}
-            {subtitle ? <Text className="text-slate-300 text-sm mt-1">{subtitle}</Text> : null}
-          </View>
-          {right ? <View className="ml-3">{right}</View> : null}
+    <View className="bg-canvas px-5 pb-3" style={{ paddingTop: insets.top + 8 }}>
+      <View className="flex-row items-center">
+        {onBack ? (
+          <PressableScale
+            onPress={onBack}
+            haptic="select"
+            className="w-10 h-10 -ml-1 mr-2.5 rounded-full items-center justify-center bg-surface border border-slate-200"
+          >
+            <IconArrowLeft size={18} />
+          </PressableScale>
+        ) : null}
+        <View className="flex-1">
+          {eyebrow ? (
+            <Text className="text-brand-700 text-[11px] font-bold uppercase tracking-widest">{eyebrow}</Text>
+          ) : null}
+          {title ? (
+            <Text className="text-slate-900 text-[22px] font-bold mt-0.5" style={{ letterSpacing: -0.44 }}>
+              {title}
+            </Text>
+          ) : null}
+          {subtitle ? <Text className="text-slate-500 text-sm mt-0.5">{subtitle}</Text> : null}
         </View>
-        {children ? <View className="mt-4">{children}</View> : null}
+        {right ? <View className="ml-3">{right}</View> : null}
       </View>
-    </LinearGradient>
+      {children ? <View className="mt-4">{children}</View> : null}
+    </View>
+  );
+}
+
+/**
+ * Botón redondo de la barra: el patrón de íconos del Topbar de la web (campana, tema, buscar).
+ * Está acá para que la campana, el selector de tema y cualquier acción futura compartan caja.
+ */
+export function TopbarButton({
+  onPress, children, badge, onDark = false,
+}: {
+  onPress?: () => void;
+  children: ReactNode;
+  /** Contador chico arriba a la derecha (notificaciones sin leer). */
+  badge?: number;
+  /** Para las pocas cabeceras que siguen sobre verde (login, arranque). */
+  onDark?: boolean;
+}) {
+  const { colors } = useTheme();
+  return (
+    <PressableScale
+      onPress={onPress}
+      haptic="select"
+      className={
+        'w-10 h-10 rounded-full items-center justify-center '
+        // El contorno es lo que lo hace leer como botón: al 15% sin borde, sobre el verde y
+        // pegado al logo, la variante oscura se veía como parte del lockup y no como un control.
+        + (onDark ? 'bg-white/20 border border-white/30' : 'bg-surface border border-slate-200')
+      }
+    >
+      {children}
+      {badge ? (
+        <View
+          className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full items-center justify-center"
+          style={{
+            backgroundColor: colors.danger.DEFAULT,
+            borderWidth: 2,
+            // El borde recorta el badge contra el fondo sobre el que flota el botón.
+            borderColor: onDark ? colors.rail : colors.canvas,
+          }}
+        >
+          <Text className="text-white text-[9px] font-bold">{badge > 9 ? '9+' : badge}</Text>
+        </View>
+      ) : null}
+    </PressableScale>
   );
 }

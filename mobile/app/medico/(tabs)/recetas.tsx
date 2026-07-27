@@ -1,49 +1,60 @@
 import { useMemo, useState } from 'react';
 import { View, Text, FlatList, RefreshControl } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { useRecetasMedico, useMiAgenda, useCrearReceta } from '../../../hooks';
+import { useRecetasMedico, useMiAgenda, useCrearReceta, useEliminarReceta } from '../../../hooks';
 import {
-  Card, Button, Input, Textarea, Chip, Sheet, ScreenHeader, EmptyState, Skeleton, toast,
-  IconPill, IconPlus,
+  Card, Button, Sheet, ScreenHeader, EmptyState, Skeleton, confirm, toast,
+  IconPill, IconPlus, IconTrash,
 } from '../../../components/ui';
+import { RecetaForm, type PacienteRef } from '../../../components/medico/RecetaForm';
 import { PressableScale, stagger } from '../../../lib/motion';
-import { colors } from '../../../lib/theme';
+import { useTheme } from '../../../lib/useTheme';
 import { formatFechaCorta } from '../../../lib/format';
+import { estadoReceta } from '../../../lib/fechas';
 import { apiError } from '../../../lib/apiError';
-
-const EMPTY = { pacienteId: '', medicamento: '', dosis: '', indicacion: '', validoHasta: '' };
+import type { CreateRecetaDTO, Receta } from '../../../services';
 
 export default function MedicoRecetas() {
+  const { colors } = useTheme();
   const { data: recetas, isLoading, isRefetching, refetch } = useRecetasMedico();
   const { data: agenda } = useMiAgenda();
   const crear = useCrearReceta();
+  const eliminar = useEliminarReceta();
 
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState(EMPTY);
 
   // Pacientes que el médico atendió (derivado de su agenda)
-  const pacientes = useMemo(() => {
-    const map = new Map<string, { id: string; nombre: string; apellido: string }>();
+  const pacientes = useMemo<PacienteRef[]>(() => {
+    const map = new Map<string, PacienteRef>();
     for (const t of agenda ?? []) if (t.paciente) map.set(t.paciente.id, t.paciente);
     return [...map.values()].sort((a, b) => a.apellido.localeCompare(b.apellido));
   }, [agenda]);
 
-  const handleEmitir = async () => {
-    if (!form.pacienteId || !form.medicamento || !form.dosis || !form.indicacion) {
-      return toast.error('Paciente, medicamento, dosis e indicación son obligatorios');
-    }
+  const handleEmitir = async (data: CreateRecetaDTO) => {
     try {
-      await crear.mutateAsync({
-        pacienteId: form.pacienteId,
-        medicamento: form.medicamento,
-        dosis: form.dosis,
-        indicacion: form.indicacion,
-        validoHasta: form.validoHasta || undefined,
-      });
+      await crear.mutateAsync(data);
       toast.success('Receta emitida');
-      setModal(false); setForm(EMPTY);
+      setModal(false);
     } catch (e) {
       toast.error(apiError(e, 'No se pudo emitir la receta'));
+    }
+  };
+
+  // Todas las de esta lista salen de /recetas/medico, o sea que son propias: el botón va
+  // siempre visible y el backend igual revalida.
+  const handleEliminar = async (receta: Receta) => {
+    const ok = await confirm({
+      title: 'Eliminar receta',
+      message: `Se va a eliminar la receta de ${receta.medicamento}. No se puede deshacer.`,
+      confirmText: 'Eliminar',
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await eliminar.mutateAsync(receta.id);
+      toast.success('Receta eliminada');
+    } catch (e) {
+      toast.error(apiError(e, 'No se pudo eliminar la receta'));
     }
   };
 
@@ -54,7 +65,7 @@ export default function MedicoRecetas() {
       <ScreenHeader eyebrow="Atención" title="Recetas" subtitle={`${count} emitida${count !== 1 ? 's' : ''}`} />
 
       <View className="px-4 pt-4">
-        <Button fullWidth iconLeft={<IconPlus size={16} color="#fff" />} disabled={pacientes.length === 0} onPress={() => { setForm(EMPTY); setModal(true); }}>
+        <Button fullWidth iconLeft={<IconPlus size={16} color="#fff" />} disabled={pacientes.length === 0} onPress={() => setModal(true)}>
           Nueva receta
         </Button>
       </View>
@@ -90,11 +101,27 @@ export default function MedicoRecetas() {
                   <Text className="text-[11px] text-slate-400">{formatFechaCorta(item.fechaEmision)}</Text>
                 </View>
                 {item.indicacion ? <Text className="text-[12px] text-slate-600 mt-2.5">{item.indicacion}</Text> : null}
-                {item.paciente ? (
-                  <Text className="text-[11px] text-slate-400 mt-2.5 pt-2.5 border-t border-slate-100">
-                    Paciente: {item.paciente.nombre} {item.paciente.apellido}
-                  </Text>
-                ) : null}
+
+                <View className="flex-row items-center justify-between mt-2.5 pt-2.5 border-t border-slate-100">
+                  <View className="flex-1 mr-2">
+                    {item.paciente ? (
+                      <Text className="text-[11px] text-slate-400" numberOfLines={1}>
+                        Paciente: {item.paciente.nombre} {item.paciente.apellido}
+                      </Text>
+                    ) : null}
+                    <Text className="text-[11px] font-semibold mt-0.5" style={{ color: vigencia(item, colors) }}>
+                      {etiquetaVigencia(item)}
+                    </Text>
+                  </View>
+                  <PressableScale
+                    onPress={() => handleEliminar(item)}
+                    haptic="warning"
+                    accessibilityLabel={`Eliminar receta de ${item.medicamento}`}
+                    className="items-center justify-center rounded-lg px-3 py-2 bg-danger-soft border border-danger/20"
+                  >
+                    <IconTrash size={14} color={colors.danger.text} />
+                  </PressableScale>
+                </View>
               </Card>
             </Animated.View>
           )}
@@ -102,18 +129,24 @@ export default function MedicoRecetas() {
       )}
 
       <Sheet visible={modal} onClose={() => setModal(false)} title="Emitir nueva receta">
-        <Text className="text-[13px] font-semibold text-slate-700 mb-2">Paciente</Text>
-        <View className="flex-row flex-wrap gap-2 mb-3">
-          {pacientes.map(p => (
-            <Chip key={p.id} label={`${p.nombre} ${p.apellido}`} active={form.pacienteId === p.id} onPress={() => setForm(f => ({ ...f, pacienteId: p.id }))} />
-          ))}
-        </View>
-        <Input label="Medicamento" value={form.medicamento} onChangeText={v => setForm(f => ({ ...f, medicamento: v }))} placeholder="Ej: Amoxicilina 500 mg" className="mb-3" />
-        <Input label="Dosis" value={form.dosis} onChangeText={v => setForm(f => ({ ...f, dosis: v }))} placeholder="Ej: 1 comprimido cada 8 hs" className="mb-3" />
-        <Textarea label="Indicación" value={form.indicacion} onChangeText={v => setForm(f => ({ ...f, indicacion: v }))} placeholder="Instrucciones de uso…" className="mb-3" />
-        <Input label="Válido hasta" hint="Opcional · AAAA-MM-DD" value={form.validoHasta} onChangeText={v => setForm(f => ({ ...f, validoHasta: v }))} placeholder="2026-12-31" className="mb-4" />
-        <Button fullWidth loading={crear.isPending} onPress={handleEmitir}>Emitir receta</Button>
+        <RecetaForm pacientes={pacientes} onSubmit={handleEmitir} loading={crear.isPending} />
       </Sheet>
     </View>
   );
+}
+
+// Etiqueta y color de vigencia, con el mismo criterio que ve el paciente (lib/fechas.ts).
+function etiquetaVigencia(receta: Receta): string {
+  const estado = estadoReceta(receta.validoHasta);
+  const hasta = formatFechaCorta(receta.validoHasta);
+  if (estado === 'vencida') return `Vencida el ${hasta}`;
+  if (estado === 'por-vencer') return `Vence pronto · ${hasta}`;
+  return `Vigente hasta ${hasta}`;
+}
+
+function vigencia(receta: Receta, colors: ReturnType<typeof useTheme>['colors']): string {
+  const estado = estadoReceta(receta.validoHasta);
+  if (estado === 'vencida') return colors.danger.text;
+  if (estado === 'por-vencer') return colors.warning.text;
+  return colors.success.text;
 }

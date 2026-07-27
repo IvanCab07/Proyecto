@@ -11,11 +11,11 @@ import {
 import { PageTransition } from '../../components/PageTransition';
 import { SeguridadCard } from '../../components/SeguridadCard';
 import { Card, Button, Dialog, Input, PasswordInput, PageHeader, StatCard, AlertInline } from '../../ui';
+import { FotoPerfil } from '../../components/FotoPerfil';
 import {
   IconEdit, IconKey, IconIdCard, IconPhone, IconShield,
   IconCalendar, IconCheckCircle, IconPill, IconArrowRight, IconStethoscope,
 } from '../../ui/icons';
-import { iniciales } from '../../lib/format';
 import { useFormulario } from '../../lib/useFormulario';
 import {
   LIMITES, limpiar, formatearTelefono,
@@ -156,12 +156,7 @@ export default function MedicoPerfil() {
         <Card className="overflow-hidden lg:row-span-2">
           <div className="gradient-card h-20" />
           <div className="px-6 pb-6">
-            <div className="flex items-end gap-4 -mt-8">
-              <div className="w-16 h-16 rounded-2xl bg-mint-grad text-rail grid place-items-center font-bold text-2xl select-none shrink-0 ring-4 ring-surface shadow-glow-mint">
-                {iniciales(user?.nombre, user?.apellido)}
-              </div>
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-pill bg-brand-100 text-brand-800 mb-1">Médico</span>
-            </div>
+            <FotoPerfil etiquetaRol="Médico" />
             <p className="font-bold text-slate-900 text-lg tracking-tightish leading-tight truncate mt-3">
               {user?.nombre} {user?.apellido}
             </p>

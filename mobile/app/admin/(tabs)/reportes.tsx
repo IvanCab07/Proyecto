@@ -7,7 +7,7 @@ import {
   IconChart, IconActivity, IconUsers, IconStethoscope,
 } from '../../../components/ui';
 import { EASE } from '../../../lib/motion';
-import { colors } from '../../../lib/theme';
+import { useTheme } from '../../../lib/useTheme';
 import { formatFechaLarga } from '../../../lib/format';
 import type { IconProps } from '../../../components/ui/Icon';
 import type { TrendPoint } from '../../../services';
@@ -25,6 +25,7 @@ function AnimatedBar({ pct, color, delay = 0 }: { pct: number; color: string; de
 }
 
 function SectionTitle({ icon: Icon, title }: { icon: (p: IconProps) => any; title: string }) {
+  const { colors } = useTheme();
   return (
     <View className="flex-row items-center gap-2 mt-5 mb-3">
       <View className="w-7 h-7 rounded-lg bg-rail items-center justify-center"><Icon size={13} color={colors.brand[300]} /></View>
@@ -35,6 +36,7 @@ function SectionTitle({ icon: Icon, title }: { icon: (p: IconProps) => any; titl
 
 // Mini gráfico de barras verticales (datos reales del backend), sin librerías.
 function TrendBars({ data, height = 92 }: { data: TrendPoint[]; height?: number }) {
+  const { colors } = useTheme();
   const max = Math.max(...data.map(d => d.total), 1);
   const labelEvery = data.length > 8 ? Math.ceil(data.length / 5) : 1;
   return (
@@ -59,6 +61,7 @@ function TrendBars({ data, height = 92 }: { data: TrendPoint[]; height?: number 
 }
 
 export default function ReportesScreen() {
+  const { colors } = useTheme();
   const { data: stats, isLoading, isRefetching, refetch } = useAdminStats();
   const [periodo, setPeriodo] = useState('dias');
 
@@ -110,14 +113,16 @@ export default function ReportesScreen() {
             {/* Tendencia */}
             <SectionTitle icon={IconActivity} title="Turnos creados" />
             <Card className="p-4">
-              <View className="flex-row items-center justify-between mb-3">
-                <Text className="text-[12px] text-slate-500">{trendTotal} en {periodo === 'dias' ? '14 días' : '6 meses'}</Text>
-                <SegmentedTabs
-                  value={periodo}
-                  onChange={setPeriodo}
-                  tabs={[{ key: 'dias', label: '14 días' }, { key: 'meses', label: '6 meses' }]}
-                />
-              </View>
+              {/* El selector va en su propia línea y no compartiendo un flex-row con el texto:
+                  con dos etiquetas largas necesita el ancho completo de la tarjeta. */}
+              <SegmentedTabs
+                value={periodo}
+                onChange={setPeriodo}
+                tabs={[{ key: 'dias', label: '14 días' }, { key: 'meses', label: '6 meses' }]}
+              />
+              <Text className="text-[12px] text-slate-500 mt-3 mb-3">
+                {trendTotal} {trendTotal === 1 ? 'turno' : 'turnos'} en {periodo === 'dias' ? 'los últimos 14 días' : 'los últimos 6 meses'}
+              </Text>
               {trendTotal === 0 ? (
                 <Text className="text-sm text-slate-400 py-6 text-center">Sin turnos en este período.</Text>
               ) : (

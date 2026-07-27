@@ -1,11 +1,10 @@
 import { Request, Response } from 'express';
-import fs from 'fs/promises';
-import path from 'path';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { HttpError, formatZodError } from '../lib/httpError';
 import { tituloEstudioSchema, descripcionEstudioSchema } from '../lib/validaciones';
 import { assertPacienteDelMedico } from '../lib/medicoPaciente';
+import { borrarArchivo } from '../lib/archivos';
 
 // El título es opcional en la API: si no viene, se usa el nombre del archivo. Pero si viene,
 // tiene que ser válido — antes entraba cualquier cosa y un título de más de 191 caracteres
@@ -26,20 +25,6 @@ const CAMPOS = {
   id: true, pacienteId: true, subidoPorId: true, titulo: true,
   descripcion: true, archivoUrl: true, tipoArchivo: true, fecha: true,
 } as const;
-
-// Borra el archivo físico. Si ya no está, no pasa nada: lo importante es la fila.
-async function borrarArchivo(archivoUrl: string): Promise<void> {
-  try {
-    // archivoUrl es "/uploads/<nombre>": nos quedamos con el nombre para no salir de la carpeta
-    const nombre = path.basename(archivoUrl);
-    await fs.unlink(path.join('uploads', nombre));
-  } catch (err) {
-    const code = (err as NodeJS.ErrnoException)?.code;
-    if (code !== 'ENOENT') {
-      console.error('[borrarArchivo]', err instanceof Error ? err.message : err);
-    }
-  }
-}
 
 // Subir un estudio. El paciente sube los suyos; el médico o el admin pueden subir
 // a nombre de un paciente mandando `pacienteId` en el body.

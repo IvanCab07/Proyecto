@@ -11,6 +11,7 @@ import { PORT } from './config/env';
 import { corsOptions } from './config/cors';
 import { getNetworkIPs } from './config/network';
 import { HttpError, formatZodError, uniqueFieldMessage } from './lib/httpError';
+import { MAX_FOTO_MB } from './middlewares/uploadImagen.middleware';
 
 import authRoutes from './routes/auth.routes';
 import turnosRoutes from './routes/turnos.routes';
@@ -60,7 +61,10 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
   // Archivo demasiado grande u otro problema de multer → 413/400, nunca un 500 genérico
   if (err instanceof MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(413).json({ error: 'El archivo supera el máximo de 10 MB' });
+      // El tope no es uno solo: los estudios admiten 10 MB y las fotos de perfil 2 MB.
+      // `err.field` es el nombre del campo del FormData, así que el mensaje dice el límite real.
+      const maxMb = err.field === 'foto' ? MAX_FOTO_MB : 10;
+      return res.status(413).json({ error: `El archivo supera el máximo de ${maxMb} MB` });
     }
     return res.status(400).json({ error: 'No se pudo procesar el archivo enviado' });
   }
@@ -122,9 +126,9 @@ app.listen(PORT, '0.0.0.0', async () => {
       console.log('  aislamiento no se pueden detectar desde esta maquina.');
     }
 
-    console.log('\n  La app celular busca el servidor sola. Si no lo encuentra, abrir');
-    console.log('  "Configurar servidor" en la pantalla de ingreso y tipear esta URL');
-    console.log('  (o escanear el QR con la camara del celular para verla):');
+    console.log('\n  La app celular busca el servidor sola. Si no lo encuentra, verificar que');
+    console.log('  el telefono este en esta misma red y usar "Reintentar" en la app.');
+    console.log('  Para fijarla a mano hay que recompilar con EXPO_PUBLIC_API_URL:');
     console.log(`\n  ${lanUrl}\n`);
     qrcode.generate(lanUrl, { small: true });
   }

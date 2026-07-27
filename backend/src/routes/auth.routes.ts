@@ -2,10 +2,12 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import {
   register, login, me, actualizarPerfil, cambiarPassword,
+  subirFotoPerfil, eliminarFotoPerfil,
   verifyEmail, resendVerification, forgotPassword, resetPassword,
   twoFactorSetup, twoFactorEnable, twoFactorDisable, twoFactorLogin,
 } from '../controllers/auth.controller';
 import { verifyToken } from '../middlewares/auth.middleware';
+import { uploadImagen } from '../middlewares/uploadImagen.middleware';
 import { asyncHandler } from '../lib/asyncHandler';
 
 const router = Router();
@@ -71,6 +73,8 @@ router.post('/2fa/login',       intentosLimit, asyncHandler(twoFactorLogin));   
 // ── Autenticadas ──
 router.get('/me',                   verifyToken, asyncHandler(me));
 router.patch('/perfil',             verifyToken, asyncHandler(actualizarPerfil));
+router.post('/perfil/foto',         verifyToken, uploadImagen.single('foto'), asyncHandler(subirFotoPerfil));
+router.delete('/perfil/foto',       verifyToken, asyncHandler(eliminarFotoPerfil));
 router.patch('/cambiar-password',   verifyToken, asyncHandler(cambiarPassword));
 router.post('/resend-verification', verifyToken, asyncHandler(resendVerification));
 router.post('/2fa/setup',           verifyToken, asyncHandler(twoFactorSetup));

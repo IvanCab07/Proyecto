@@ -4,33 +4,22 @@ import { useLocalSearchParams } from 'expo-router';
 import Animated, { SlideInRight, SlideInLeft } from 'react-native-reanimated';
 import { useEspecialidades, useMedicosPorEspecialidad, useCrearTurno, useDisponibilidad } from '../../../hooks';
 import {
-  Card, Button, Textarea, Avatar, Stepper, ScreenHeader, Spinner, toast,
+  Card, Calendario, Button, Textarea, Avatar, Stepper, ScreenHeader, Spinner, toast,
   IconStethoscope, IconCheckCircle, IconChevronLeft, IconChevronRight, IconCalendarCheck, IconCheck, IconDoctor,
 } from '../../../components/ui';
 import { PressableScale } from '../../../lib/motion';
 import { haptic } from '../../../lib/haptics';
-import { colors, shadow } from '../../../lib/theme';
-import { MESES_LARGO, DIAS_SEMANA } from '../../../lib/format';
+import { useTheme } from '../../../lib/useTheme';
 import { cn } from '../../../lib/cn';
 import { apiError } from '../../../lib/apiError';
 
 const HORARIOS = ['08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30'];
 
-function useDatePicker() {
-  const hoy = new Date();
-  const [viewYear, setViewYear] = useState(hoy.getFullYear());
-  const [viewMonth, setViewMonth] = useState(hoy.getMonth());
-  const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
-  const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const firstWeekDay = new Date(viewYear, viewMonth, 1).getDay();
-  return { viewYear, viewMonth, prevMonth, nextMonth, daysInMonth, firstWeekDay };
-}
-
 const STEPS_SHORT = ['Médico', 'Fecha', 'Confirmar'];
 const STEPS_LONG = ['Especialidad y médico', 'Fecha y horario', 'Confirmar turno'];
 
 export default function SolicitarTurnoScreen() {
+  const { colors, shadow } = useTheme();
   const params = useLocalSearchParams<{ prefillEspecialidadId?: string; prefillMedicoId?: string }>();
 
   const [step, setStep] = useState(1);
@@ -43,7 +32,6 @@ export default function SolicitarTurnoScreen() {
 
   useEffect(() => { if (params.prefillEspecialidadId && params.prefillMedicoId) setStep(2); }, []);
 
-  const cal = useDatePicker();
   const { data: especialidades, isLoading: loadEsp } = useEspecialidades();
   const { data: medicos, isLoading: loadMed } = useMedicosPorEspecialidad(especialidadId);
   const { data: disponibilidad } = useDisponibilidad(medicoId, fecha);
@@ -58,24 +46,18 @@ export default function SolicitarTurnoScreen() {
   const goNext = () => { setDir(1); setStep(s => s + 1); };
   const goBack = () => { setDir(-1); setStep(s => s - 1); };
 
-  const handleDayPress = (day: number) => {
-    const d = new Date(cal.viewYear, cal.viewMonth, day);
-    d.setHours(0, 0, 0, 0);
-    if (d < hoy) return;
-    if (d.getDay() === 0) return;
-    const mm = String(cal.viewMonth + 1).padStart(2, '0');
-    const dd = String(day).padStart(2, '0');
-    setFecha(`${cal.viewYear}-${mm}-${dd}`);
+  const handleDayPress = (clave: string) => {
+    setFecha(clave);
+    // Cambiar de día invalida el horario elegido: puede estar ocupado en la fecha nueva.
     setHora('');
-    haptic.select();
   };
 
-  const selectedDay = useMemo(() => {
-    if (!fecha) return null;
-    const [y, m, d] = fecha.split('-').map(Number);
-    if (y === cal.viewYear && m - 1 === cal.viewMonth) return d;
-    return null;
-  }, [fecha, cal.viewYear, cal.viewMonth]);
+  // No se atiende los domingos ni en fechas pasadas.
+  const diaBloqueado = (_clave: string, d: Date) => {
+    const dia = new Date(d);
+    dia.setHours(0, 0, 0, 0);
+    return dia < hoy || dia.getDay() === 0;
+  };
 
   const handleConfirmar = async () => {
     if (!medicoId || !fecha || !hora) return toast.error('Completá todos los campos');
@@ -157,47 +139,23 @@ export default function SolicitarTurnoScreen() {
           {/* STEP 2 */}
           {step === 2 ? (
             <View>
-              <Card className="p-4 mb-4">
-                <View className="flex-row items-center justify-between mb-3.5">
-                  <PressableScale onPress={cal.prevMonth} haptic="select" className="w-9 h-9 rounded-lg bg-slate-100 items-center justify-center"><IconChevronLeft size={14} color={colors.slate[600]} /></PressableScale>
-                  <Text className="font-bold text-slate-900 text-[15px]">{MESES_LARGO[cal.viewMonth]} {cal.viewYear}</Text>
-                  <PressableScale onPress={cal.nextMonth} haptic="select" className="w-9 h-9 rounded-lg bg-slate-100 items-center justify-center"><IconChevronRight size={14} color={colors.slate[600]} /></PressableScale>
-                </View>
-
-                <View className="flex-row mb-1.5">
-                  {DIAS_SEMANA.map((d, i) => (
-                    <View key={d} className="flex-1 items-center"><Text className="text-[11px] font-bold" style={{ color: i === 0 ? colors.danger.DEFAULT : colors.slate[400] }}>{d}</Text></View>
-                  ))}
-                </View>
-
-                <View className="flex-row flex-wrap">
-                  {Array.from({ length: cal.firstWeekDay }).map((_, i) => <View key={`e-${i}`} style={{ width: `${100 / 7}%` }} />)}
-                  {Array.from({ length: cal.daysInMonth }, (_, i) => i + 1).map(day => {
-                    const d = new Date(cal.viewYear, cal.viewMonth, day); d.setHours(0, 0, 0, 0);
-                    const isPast = d < hoy;
-                    const isDomingo = d.getDay() === 0;
-                    const isBlocked = isPast || isDomingo;
-                    const isSelected = selectedDay === day;
-                    const isToday = d.getTime() === hoy.getTime();
-                    return (
-                      <Pressable key={day} onPress={() => handleDayPress(day)} disabled={isBlocked} style={{ width: `${100 / 7}%`, padding: 2 }}>
-                        <View className="items-center justify-center rounded-lg py-2" style={{ backgroundColor: isSelected ? colors.brand[600] : isToday ? colors.brand[50] : 'transparent', borderWidth: isToday && !isSelected ? 1.5 : 0, borderColor: colors.brand[600] }}>
-                          <Text style={{ fontSize: 13, fontWeight: isSelected || isToday ? '800' : '400', color: isSelected ? '#fff' : isBlocked ? (isDomingo ? '#fca5a5' : colors.slate[300]) : isToday ? colors.brand[700] : colors.slate[700] }}>{day}</Text>
-                        </View>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-
-                {fecha ? (
-                  <View className="flex-row items-center gap-1.5 mt-3 pt-3 border-t border-slate-100">
-                    <IconCalendarCheck size={14} color={colors.success.DEFAULT} />
-                    <Text className="text-[13px] font-semibold capitalize" style={{ color: colors.success.text }}>
-                      {new Date(`${fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}
-                    </Text>
-                  </View>
-                ) : null}
-              </Card>
+              <View className="mb-4">
+                <Calendario
+                  titulo="Elegí una fecha"
+                  ayuda="No se atiende los domingos."
+                  seleccion={fecha || null}
+                  onSelect={handleDayPress}
+                  deshabilitar={diaBloqueado}
+                  pie={fecha ? (
+                    <View className="flex-row items-center gap-1.5 pt-3 border-t border-slate-100">
+                      <IconCalendarCheck size={14} color={colors.success.DEFAULT} />
+                      <Text className="text-[13px] font-semibold capitalize" style={{ color: colors.success.text }}>
+                        {new Date(`${fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                      </Text>
+                    </View>
+                  ) : null}
+                />
+              </View>
 
               {fecha ? (
                 <>
@@ -220,7 +178,7 @@ export default function SolicitarTurnoScreen() {
                     })}
                   </View>
                   <View className="flex-row items-center gap-2 mb-5">
-                    <View className="w-3 h-3 rounded" style={{ backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FCD34D' }} />
+                    <View className="w-3 h-3 rounded" style={{ backgroundColor: colors.amber[50], borderWidth: 1, borderColor: colors.amber[300] }} />
                     <Text className="text-[12px] text-slate-500 flex-1">
                       Horario ocupado: lo podés tomar como <Text className="font-bold text-amber-700">sobreturno</Text> (lista de espera).
                     </Text>
@@ -247,9 +205,9 @@ export default function SolicitarTurnoScreen() {
               </Card>
 
               {esSobreturno ? (
-                <View className="flex-row gap-2.5 p-3.5 mb-4 rounded-card" style={{ backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FCD34D' }}>
+                <View className="flex-row gap-2.5 p-3.5 mb-4 rounded-card" style={{ backgroundColor: colors.amber[50], borderWidth: 1, borderColor: colors.amber[300] }}>
                   <IconCalendarCheck size={18} color={colors.warning.DEFAULT} />
-                  <Text className="text-[13px] flex-1" style={{ color: '#92400E' }}>
+                  <Text className="text-[13px] flex-1" style={{ color: colors.amber[700] }}>
                     Ese horario está ocupado. Vas a quedar como <Text className="font-bold">sobreturno</Text> en lista de espera:
                     si el turno se cancela o el paciente no asiste, se te cede automáticamente y te avisamos.
                   </Text>

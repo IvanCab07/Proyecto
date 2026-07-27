@@ -8,12 +8,13 @@ import {
   IconTag, IconPlus, IconEdit, IconTrash, IconStethoscope,
 } from '../../components/ui';
 import { PressableScale, stagger } from '../../lib/motion';
-import { colors } from '../../lib/theme';
+import { useTheme } from '../../lib/useTheme';
 import { apiError } from '../../lib/apiError';
 
 type ModalMode = 'crear' | 'editar' | null;
 
 export default function EspecialidadesScreen() {
+  const { colors } = useTheme();
   const { data: especialidades, isLoading, isRefetching, refetch } = useEspecialidades();
   const crearEsp = useCrearEspecialidad();
   const actualizarEsp = useActualizarEspecialidad();

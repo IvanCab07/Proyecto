@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, Linking, Platform } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,7 +9,7 @@ import {
   IconMapPin, IconAlertCircle, IconArrowLeft, IconPhone, IconHospital, IconStethoscope,
 } from '../../components/ui';
 import { PressableScale } from '../../lib/motion';
-import { colors, gradients, shadow } from '../../lib/theme';
+import { useTheme } from '../../lib/useTheme';
 
 type Coords = { latitude: number; longitude: number };
 type Lugar = Coords & { id: string; nombre: string; direccion: string; telefono: string; tipo: 'hospital' | 'caps' };
@@ -45,6 +44,7 @@ const comoLlegar = (l: Lugar) =>
 const llamar = (l: Lugar) => Linking.openURL(`tel:${l.telefono}`);
 
 export default function MapaScreen() {
+  const { colors, shadow } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const mapRef = useRef<MapView>(null);
@@ -95,10 +95,10 @@ export default function MapaScreen() {
 
   if (loading) {
     return (
-      <LinearGradient colors={gradients.railHero} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <Spinner size={26} color={colors.brand[400]} />
-        <Text className="text-slate-400 text-sm mt-3">Cargando centros de salud…</Text>
-      </LinearGradient>
+      <View style={{ flex: 1, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' }}>
+        <Spinner size={26} />
+        <Text className="text-slate-500 text-sm mt-3">Cargando centros de salud…</Text>
+      </View>
     );
   }
 
@@ -210,19 +210,21 @@ export default function MapaScreen() {
 
         <View className="px-4 flex-row gap-3">
           <PressableScale
+            fill
             onPress={() => selected && comoLlegar(selected)}
             haptic="medium"
             style={shadow.pop}
-            className="flex-1 flex-row items-center justify-center gap-2 bg-surface rounded-card h-[52px]"
+            className="flex-row items-center justify-center gap-2 bg-surface rounded-card h-[52px]"
           >
             <IconMapPin size={18} color={colors.brand[600]} />
             <Text className="text-brand-700 font-bold text-sm">Ir a {selected?.nombre.split(' ')[0]}</Text>
           </PressableScale>
           <PressableScale
+            fill
             onPress={handleEmergencia}
             haptic="warning"
             style={shadow.pop}
-            className="flex-1 flex-row items-center justify-center gap-2 bg-danger rounded-card h-[52px]"
+            className="flex-row items-center justify-center gap-2 bg-danger rounded-card h-[52px]"
           >
             <IconAlertCircle size={18} color="#fff" />
             <Text className="text-white font-bold text-sm">EMERGENCIA</Text>

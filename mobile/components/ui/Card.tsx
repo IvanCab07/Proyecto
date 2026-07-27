@@ -1,10 +1,11 @@
 import { View } from 'react-native';
 import type { ViewProps } from 'react-native';
 import { cn } from '../../lib/cn';
-import { shadow } from '../../lib/theme';
+import { useTheme } from '../../lib/useTheme';
 
-// Superficie blanca elevada sobre el lienzo tintado.
+// Superficie elevada sobre el lienzo tintado (blanca en claro, slate-800 en oscuro).
 export function Card({ className, style, children, flat, ...rest }: ViewProps & { className?: string; flat?: boolean }) {
+  const { shadow } = useTheme();
   return (
     <View
       style={[flat ? undefined : shadow.card, style]}

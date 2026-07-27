@@ -209,6 +209,33 @@ export const useActualizarPerfil = () => {
   });
 };
 
+// ── Foto de perfil ──
+
+export const useSubirFotoPerfil = () => {
+  const loadUser = useAuthStore(s => s.loadUser);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (formData: FormData) => authService.subirFoto(formData),
+    onSuccess: () => {
+      loadUser();
+      // El listado de cuentas del admin también muestra la foto.
+      qc.invalidateQueries({ queryKey: ['cuentas'] });
+    },
+  });
+};
+
+export const useEliminarFotoPerfil = () => {
+  const loadUser = useAuthStore(s => s.loadUser);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => authService.eliminarFoto(),
+    onSuccess: () => {
+      loadUser();
+      qc.invalidateQueries({ queryKey: ['cuentas'] });
+    },
+  });
+};
+
 export const useCambiarPassword = () =>
   useMutation({ mutationFn: (data: CambiarPasswordDTO) => authService.cambiarPassword(data) });
 

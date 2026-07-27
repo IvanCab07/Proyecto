@@ -1,22 +1,25 @@
 import { useState, useMemo } from 'react';
-import { View, Text, SectionList, RefreshControl, Pressable } from 'react-native';
+import { View, Text, SectionList, RefreshControl, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { useMisTurnos, useCancelarTurno, useCrearCalificacion } from '../../../hooks';
 import { useAuthStore } from '../../../hooks/useAuthStore';
 import {
-  Card, StatusBadge, Stars, SegmentedTabs, Sheet, Button, Textarea, ScreenHeader, EmptyState, Skeleton, toast,
-  IconClock, IconCheckCircle, IconCalendar, IconCalendarCheck, IconX, IconRefresh, IconStar, IconChevronLeft, IconChevronRight,
+  Card, Calendario, StatusBadge, Stars, SegmentedTabs, Sheet, Button, Textarea, ScreenHeader, EmptyState, Skeleton, toast,
+  HoraTurno,
+  IconClock, IconCheckCircle, IconCalendar, IconX, IconRefresh, IconStar, IconChevronDown,
 } from '../../../components/ui';
+import type { MarcaDia } from '../../../components/ui';
 import { PressableScale, stagger } from '../../../lib/motion';
-import { colors, STATUS } from '../../../lib/theme';
-import { formatFechaCorta } from '../../../lib/format';
+import { useTheme } from '../../../lib/useTheme';
 import { apiError } from '../../../lib/apiError';
+import { claveFecha } from '../../../lib/fechas';
 import type { Turno } from '../../../services';
 
 type Tab = 'proximos' | 'historial';
 
 export default function TurnosScreen() {
+  const { colors, STATUS } = useTheme();
   const { data: turnos, isLoading, isRefetching, refetch } = useMisTurnos();
   const cancelar = useCancelarTurno();
   const calificar = useCrearCalificacion();
@@ -31,6 +34,9 @@ export default function TurnosScreen() {
   const [estrellas, setEstrellas] = useState(0);
   const [comentario, setComentario] = useState('');
   const [turnosDelDia, setTurnosDelDia] = useState<Turno[] | null>(null);
+  // El calendario arranca plegado: en pantallas chicas, header + calendario + tabs se comían
+  // todo el alto antes de la primera tarjeta.
+  const [verCalendario, setVerCalendario] = useState(false);
 
   const handleCancelar = (t: Turno) => { setCancelModal(t); setRazon(''); };
 
@@ -100,6 +106,21 @@ export default function TurnosScreen() {
 
   const completados = historial.filter(t => t.status === 'COMPLETADO').length;
 
+  // Turnos agrupados por día, con el color del estado. Así el calendario distingue un
+  // cancelado de un confirmado en vez de pintar todo del mismo verde.
+  const turnosPorFecha = useMemo(() => (turnos ?? []).reduce<Record<string, Turno[]>>((acc, t) => {
+    (acc[claveFecha(t.fecha)] ??= []).push(t);
+    return acc;
+  }, {}), [turnos]);
+
+  const marcas = useMemo(() => {
+    const out: Record<string, MarcaDia[]> = {};
+    for (const [fecha, lista] of Object.entries(turnosPorFecha)) {
+      out[fecha] = lista.map(t => ({ key: t.id, color: STATUS[t.status].dot }));
+    }
+    return out;
+  }, [turnosPorFecha, STATUS]);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.canvas }}>
       <ScreenHeader eyebrow="Bienvenido/a" title={`${user?.nombre ?? ''} ${user?.apellido ?? ''}`.trim() || 'Mis turnos'}>
@@ -109,10 +130,6 @@ export default function TurnosScreen() {
           <Pill icon={<IconCalendar size={14} color={colors.brand[300]} />} value={turnos?.length ?? 0} label="Total" />
         </View>
       </ScreenHeader>
-
-      <View className="px-4 pt-3">
-        <CalendarioTurnos turnos={turnos ?? []} onSelectDay={setTurnosDelDia} />
-      </View>
 
       <View className="px-4 py-3">
         <SegmentedTabs
@@ -135,6 +152,39 @@ export default function TurnosScreen() {
           showsVerticalScrollIndicator={false}
           stickySectionHeadersEnabled={false}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.brand[500]} />}
+          ListHeaderComponent={
+            // Va acá y no fuera de la lista: así scrollea junto con los turnos en vez de
+            // ocupar alto fijo permanente.
+            <View className="pt-3">
+              <PressableScale
+                onPress={() => setVerCalendario(v => !v)}
+                haptic="select"
+                className="flex-row items-center justify-between rounded-xl bg-surface border border-slate-100 px-3.5 py-2.5"
+              >
+                <View className="flex-row items-center gap-2">
+                  <IconCalendar size={15} color={colors.brand[600]} />
+                  <Text className="text-[13px] font-bold text-slate-700">Calendario del mes</Text>
+                </View>
+                <View style={{ transform: [{ rotate: verCalendario ? '180deg' : '0deg' }] }}>
+                  <IconChevronDown size={17} color={colors.slate[500]} />
+                </View>
+              </PressableScale>
+
+              {verCalendario ? (
+                <View className="mt-2.5">
+                  <Calendario
+                    densidad="compacta"
+                    titulo="Tus turnos"
+                    ayuda="Tocá un día marcado para ver el detalle."
+                    marcas={marcas}
+                    deshabilitar={(fecha) => !turnosPorFecha[fecha]}
+                    onSelect={(fecha) => setTurnosDelDia(turnosPorFecha[fecha] ?? null)}
+                    pie={<Leyenda />}
+                  />
+                </View>
+              ) : null}
+            </View>
+          }
           ListEmptyComponent={
             <EmptyState
               className="pt-12"
@@ -184,6 +234,9 @@ export default function TurnosScreen() {
       </Sheet>
 
       <Sheet visible={!!turnosDelDia} onClose={() => setTurnosDelDia(null)} title="Turnos del día">
+        {/* El Sheet renderiza sus children en un View plano: si el día tiene varios turnos,
+            sin este ScrollView el contenido se desborda y no hay forma de llegar al último. */}
+        <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
         <View className="gap-3 pb-2">
           {turnosDelDia?.map(turno => (
             <View key={turno.id} className="rounded-xl bg-slate-50 border border-slate-200 p-3.5">
@@ -202,85 +255,46 @@ export default function TurnosScreen() {
             </View>
           ))}
         </View>
+        </ScrollView>
       </Sheet>
     </View>
   );
 }
 
-const MESES_COMPLETOS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-const DIAS_SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-
-function claveFecha(fecha: string) {
-  return fecha.slice(0, 10);
-}
-
-function CalendarioTurnos({ turnos, onSelectDay }: { turnos: Turno[]; onSelectDay: (turnos: Turno[]) => void }) {
-  const hoy = new Date();
-  const [mesVisible, setMesVisible] = useState(() => new Date(hoy.getFullYear(), hoy.getMonth(), 1));
-  const turnosPorFecha = useMemo(() => turnos.reduce<Record<string, Turno[]>>((acumulado, turno) => {
-    const fecha = claveFecha(turno.fecha);
-    (acumulado[fecha] ??= []).push(turno);
-    return acumulado;
-  }, {}), [turnos]);
-  const primerDia = new Date(mesVisible.getFullYear(), mesVisible.getMonth(), 1);
-  const ultimoDia = new Date(mesVisible.getFullYear(), mesVisible.getMonth() + 1, 0);
-  const espaciosIniciales = (primerDia.getDay() + 6) % 7;
-  const celdas: Array<Date | null> = [
-    ...Array.from({ length: espaciosIniciales }, () => null),
-    ...Array.from({ length: ultimoDia.getDate() }, (_, indice) => new Date(mesVisible.getFullYear(), mesVisible.getMonth(), indice + 1)),
+// Leyenda de colores del calendario. Los mismos tonos que usan los badges de estado, así
+// un punto rojo en el calendario y la pastilla "Cancelado" del turno hablan el mismo idioma.
+function Leyenda() {
+  const { STATUS } = useTheme();
+  const items: Array<[string, string]> = [
+    ['Confirmado', STATUS.CONFIRMADO.dot],
+    ['Pendiente', STATUS.PENDIENTE.dot],
+    ['Completado', STATUS.COMPLETADO.dot],
+    ['Cancelado', STATUS.CANCELADO.dot],
   ];
-  while (celdas.length % 7 !== 0) celdas.push(null);
-
   return (
-    <Card className="p-4">
-      <View className="flex-row items-center justify-between mb-4">
-        <View>
-          <Text className="text-[16px] font-bold text-slate-900">Calendario de turnos</Text>
-          <Text className="text-[12px] text-slate-400 mt-0.5">Tocá un día marcado para ver el detalle.</Text>
-        </View>
-        <View className="flex-row gap-1">
-          <Pressable accessibilityLabel="Mes anterior" onPress={() => setMesVisible(actual => new Date(actual.getFullYear(), actual.getMonth() - 1, 1))} className="w-8 h-8 rounded-lg bg-slate-50 items-center justify-center"><IconChevronLeft size={17} color={colors.slate[600]} /></Pressable>
-          <Pressable accessibilityLabel="Mes siguiente" onPress={() => setMesVisible(actual => new Date(actual.getFullYear(), actual.getMonth() + 1, 1))} className="w-8 h-8 rounded-lg bg-slate-50 items-center justify-center"><IconChevronRight size={17} color={colors.slate[600]} /></Pressable>
-        </View>
-      </View>
-      <Text className="text-center text-[14px] font-bold text-slate-900 mb-3">{MESES_COMPLETOS[mesVisible.getMonth()]} {mesVisible.getFullYear()}</Text>
-      <View className="flex-row mb-1">
-        {DIAS_SEMANA.map(dia => <Text key={dia} className="flex-1 text-center text-[10px] font-bold text-slate-400 uppercase">{dia}</Text>)}
-      </View>
-      {Array.from({ length: celdas.length / 7 }, (_, fila) => (
-        <View key={fila} className="flex-row mb-1">
-          {celdas.slice(fila * 7, fila * 7 + 7).map((dia, columna) => {
-            if (!dia) return <View key={columna} className="flex-1 h-10" />;
-            const fecha = `${dia.getFullYear()}-${String(dia.getMonth() + 1).padStart(2, '0')}-${String(dia.getDate()).padStart(2, '0')}`;
-            const turnosDia = turnosPorFecha[fecha] ?? [];
-            const tieneTurnos = turnosDia.length > 0;
-            const esHoy = dia.getFullYear() === hoy.getFullYear() && dia.getMonth() === hoy.getMonth() && dia.getDate() === hoy.getDate();
-            return (
-              <View key={fecha} className="flex-1 px-0.5">
-                <Pressable
-                  disabled={!tieneTurnos}
-                  accessibilityLabel={tieneTurnos ? `${dia.getDate()} de ${MESES_COMPLETOS[dia.getMonth()]}, ${turnosDia.length} turnos` : undefined}
-                  onPress={() => onSelectDay(turnosDia)}
-                  className={`h-10 rounded-lg items-center justify-center ${tieneTurnos ? 'bg-brand-50 border border-brand-100' : ''} ${esHoy ? 'border-2 border-brand-500' : ''}`}
-                >
-                  <Text className={`text-[13px] font-bold ${tieneTurnos ? 'text-brand-700' : 'text-slate-600'}`}>{dia.getDate()}</Text>
-                  {tieneTurnos ? <View className="absolute bottom-1 w-1 h-1 rounded-full bg-brand-600" /> : null}
-                </Pressable>
-              </View>
-            );
-          })}
+    <View className="flex-row flex-wrap gap-x-3 gap-y-1.5 pt-2 border-t border-slate-100">
+      {items.map(([label, color]) => (
+        <View key={label} className="flex-row items-center gap-1.5">
+          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
+          <Text className="text-[11px] text-slate-500">{label}</Text>
         </View>
       ))}
-    </Card>
+    </View>
   );
 }
 
+// Píldoras de resumen del encabezado.
+//
+// Iban en blanco sobre el hero verde de la versión anterior; desde que ScreenHeader es
+// bg-canvas (claro), ese blanco sobre blanco era invisible. Ahora siguen el mismo patrón que
+// StatCard: fondo brand-50 y texto de la rampa slate, que se invierte sola con el tema.
 function Pill({ icon, value, label }: { icon: React.ReactNode; value: number; label: string }) {
+  const { colors } = useTheme();
   return (
-    <View className="flex-1 rounded-xl p-3" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
+    <View className="flex-1 rounded-xl p-3 border border-slate-100" style={{ backgroundColor: colors.brand[50] }}>
       {icon}
-      <Text className="text-white font-bold text-[22px] mt-1" style={{ fontVariant: ['tabular-nums'], letterSpacing: -0.5 }}>{value}</Text>
-      <Text className="text-slate-400 text-[11px] font-medium mt-0.5">{label}</Text>
+      <Text className="text-slate-900 font-bold text-[22px] mt-1" style={{ fontVariant: ['tabular-nums'], letterSpacing: -0.5 }}>{value}</Text>
+      <Text className="text-slate-500 text-[11px] font-medium mt-0.5">{label}</Text>
     </View>
   );
 }
@@ -299,35 +313,24 @@ function TurnoCard({ item, index, onCancelar, onReagendar, onCalificar, puedeCal
   onCancelar: (t: Turno) => void; onReagendar: (t: Turno) => void; onCalificar: (t: Turno) => void;
   puedeCalificar: boolean;
 }) {
-  const s = STATUS[item.status] ?? STATUS.PENDIENTE;
+  const { colors } = useTheme();
   return (
     <Animated.View entering={stagger(index)}>
       <Card className="overflow-hidden flex-row">
-        <View style={{ width: 4, backgroundColor: s.strip }} />
+        <HoraTurno hora={item.hora} fecha={item.fecha} />
         <View className="flex-1 p-4">
-          <View className="flex-row items-start justify-between mb-2">
+          <View className="flex-row items-start justify-between mb-1">
             <View className="flex-1 mr-2.5">
               <Text className="text-[15px] font-bold text-slate-900" style={{ letterSpacing: -0.2 }}>Dr. {item.medico.apellido}, {item.medico.nombre}</Text>
               <Text className="text-[13px] text-brand-700 font-semibold mt-0.5">{item.medico.especialidad.nombre}</Text>
             </View>
             <View className="flex-row items-center gap-1.5">
               {item.esSobreturno ? (
-                <View className="px-2 py-1 rounded-pill" style={{ backgroundColor: '#FEF3C7' }}>
-                  <Text className="text-[11px] font-bold" style={{ color: '#B45309' }}>Sobreturno</Text>
+                <View className="px-2 py-1 rounded-pill bg-warning-soft">
+                  <Text className="text-[11px] font-bold text-warning-text">Sobreturno</Text>
                 </View>
               ) : null}
               <StatusBadge status={item.status} />
-            </View>
-          </View>
-
-          <View className="flex-row items-center gap-4 bg-slate-50 rounded-lg p-2.5">
-            <View className="flex-row items-center gap-1.5">
-              <IconCalendarCheck size={13} color={colors.slate[500]} />
-              <Text className="text-[13px] text-slate-600 font-semibold capitalize">{formatFechaCorta(item.fecha)}</Text>
-            </View>
-            <View className="flex-row items-center gap-1.5">
-              <IconClock size={13} color={colors.slate[500]} />
-              <Text className="text-[13px] text-slate-700 font-bold">{item.hora} hs</Text>
             </View>
           </View>
 
@@ -343,10 +346,10 @@ function TurnoCard({ item, index, onCancelar, onReagendar, onCalificar, puedeCal
           {item.razonCancelacion ? <InfoBox tone={colors.danger} label="Razón de cancelación" text={item.razonCancelacion} /> : null}
 
           {item.status === 'COMPLETADO' && item.calificacion ? (
-            <View className="mt-2 rounded-lg p-2.5" style={{ backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A' }}>
+            <View className="mt-2 rounded-lg p-2.5" style={{ backgroundColor: colors.amber[50], borderWidth: 1, borderColor: colors.amber[200] }}>
               <View className="flex-row items-center gap-2">
                 <Stars value={item.calificacion.estrellas} size={15} />
-                <Text className="text-[11px] font-bold" style={{ color: '#B45309' }}>Tu calificación</Text>
+                <Text className="text-[11px] font-bold" style={{ color: colors.amber[700] }}>Tu calificación</Text>
               </View>
               {item.calificacion.comentario ? <Text className="text-[12px] text-slate-600 mt-1 italic">“{item.calificacion.comentario}”</Text> : null}
             </View>
@@ -366,8 +369,8 @@ function TurnoCard({ item, index, onCancelar, onReagendar, onCalificar, puedeCal
           ) : null}
           {item.status === 'COMPLETADO' && !item.calificacion && puedeCalificar ? (
             <PressableScale onPress={() => onCalificar(item)} haptic="medium" className="mt-3 flex-row items-center justify-center gap-1.5 rounded-lg py-2.5 bg-amber-50 border border-amber-200">
-              <IconStar size={14} color="#B45309" />
-              <Text className="text-[13px] font-bold" style={{ color: '#B45309' }}>Calificar atención</Text>
+              <IconStar size={14} color={colors.amber[700]} />
+              <Text className="text-[13px] font-bold" style={{ color: colors.amber[700] }}>Calificar atención</Text>
             </PressableScale>
           ) : null}
         </View>

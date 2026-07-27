@@ -7,6 +7,8 @@ export interface User {
   apellido: string;
   dni: string;
   telefono?: string;
+  /** Ruta relativa de la foto de perfil ("/uploads/avatar-x.jpg"). null = mostrar iniciales. */
+  fotoUrl?: string | null;
   role: 'PATIENT' | 'ADMIN' | 'MEDICO';
   emailVerified: boolean;
   twoFactorEnabled: boolean;
@@ -120,7 +122,8 @@ export interface Receta {
 // Cuenta de usuario para la gestión del admin (incluye activo y la ficha de médico si aplica)
 export interface Cuenta {
   id: string; email: string; nombre: string; apellido: string; dni: string;
-  telefono?: string; role: 'PATIENT' | 'ADMIN' | 'MEDICO'; activo: boolean; createdAt: string;
+  telefono?: string; fotoUrl?: string | null;
+  role: 'PATIENT' | 'ADMIN' | 'MEDICO'; activo: boolean; createdAt: string;
   puedeCalificar: boolean;
   // Por qué y cuándo se dio de baja la cuenta (null mientras está activa)
   motivoBaja?: string | null; desactivadoAt?: string | null;
@@ -177,6 +180,17 @@ export const authService = {
     const res = await api.patch<{ message: string }>('/auth/cambiar-password', data);
     return res.data;
   },
+
+  // ── Foto de perfil ──
+  // Los dos devuelven el usuario completo, así que alcanza con recargarlo en el store.
+  // El FormData lleva la imagen bajo el campo "foto" (lo exige uploadImagen.middleware).
+  subirFoto: (formData: FormData) =>
+    api.post<User>('/auth/perfil/foto', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(r => r.data),
+
+  eliminarFoto: () =>
+    api.delete<User>('/auth/perfil/foto').then(r => r.data),
   logout: () => { localStorage.removeItem('auth_token'); },
 
   // ── Verificación de email ──

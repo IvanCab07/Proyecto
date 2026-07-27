@@ -165,11 +165,37 @@ export const useMisEstudios = () =>
     queryFn: estudiosService.misEstudios,
   });
 
+/** Estudios de un paciente. Lo usa el médico desde el historial (el backend valida la relación). */
+export const useEstudiosPaciente = (pacienteId: string) =>
+  useQuery({
+    queryKey: ['estudios-paciente', pacienteId],
+    queryFn: () => estudiosService.porPaciente(pacienteId),
+    enabled: !!pacienteId,
+  });
+
 export const useSubirEstudio = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (formData: FormData) => estudiosService.subir(formData),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['mis-estudios'] }),
+    // Ahora también sube el médico a nombre de un paciente, así que hay que refrescar la
+    // vista del paciente, la del médico y el historial del admin.
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['mis-estudios'] });
+      qc.invalidateQueries({ queryKey: ['estudios-paciente'] });
+      qc.invalidateQueries({ queryKey: ['historial'] });
+    },
+  });
+};
+
+export const useEliminarEstudio = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => estudiosService.eliminar(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['mis-estudios'] });
+      qc.invalidateQueries({ queryKey: ['estudios-paciente'] });
+      qc.invalidateQueries({ queryKey: ['historial'] });
+    },
   });
 };
 
@@ -186,6 +212,18 @@ export const useCrearReceta = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['historial'] });
       qc.invalidateQueries({ queryKey: ['recetas-medico'] });
+    },
+  });
+};
+
+export const useEliminarReceta = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => recetasService.eliminar(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['recetas-medico'] });
+      qc.invalidateQueries({ queryKey: ['mis-recetas'] });
+      qc.invalidateQueries({ queryKey: ['historial'] });
     },
   });
 };
@@ -215,6 +253,26 @@ export const useCambiarPassword = () =>
   useMutation({
     mutationFn: (data: CambiarPasswordDTO) => authService.cambiarPassword(data),
   });
+
+// ── Foto de perfil ──
+// Los dos endpoints devuelven el usuario completo, pero se recarga con loadUser() igual que
+// useActualizarPerfil: el store es la única fuente de verdad del usuario logueado.
+
+export const useSubirFotoPerfil = () => {
+  const loadUser = useAuthStore(s => s.loadUser);
+  return useMutation({
+    mutationFn: (formData: FormData) => authService.subirFoto(formData),
+    onSuccess: () => loadUser(),
+  });
+};
+
+export const useEliminarFotoPerfil = () => {
+  const loadUser = useAuthStore(s => s.loadUser);
+  return useMutation({
+    mutationFn: () => authService.eliminarFoto(),
+    onSuccess: () => loadUser(),
+  });
+};
 
 // ── Seguridad de cuenta (verificación de email + 2FA) ──
 export const useReenviarVerificacion = () =>

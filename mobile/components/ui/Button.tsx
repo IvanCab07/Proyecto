@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Text } from 'react-native';
 import { cn } from '../../lib/cn';
 import { PressableScale } from '../../lib/motion';
-import { colors, shadow } from '../../lib/theme';
+import { useTheme } from '../../lib/useTheme';
 import type { HapticKind } from '../../lib/haptics';
 import { Spinner } from './Spinner';
 
@@ -20,9 +20,6 @@ const LABEL: Record<Variant, string> = {
 };
 const SIZE_BOX: Record<Size, string> = { sm: 'h-9 px-3.5', md: 'h-11 px-4', lg: 'h-[52px] px-5' };
 const SIZE_TXT: Record<Size, string> = { sm: 'text-[13px]', md: 'text-[15px]', lg: 'text-base' };
-const SPIN: Record<Variant, string> = {
-  primary: '#fff', danger: '#fff', secondary: colors.slate[600], ghost: colors.slate[600],
-};
 
 export interface ButtonProps {
   variant?: Variant;
@@ -42,7 +39,11 @@ export function Button({
   variant = 'primary', size = 'md', loading = false, disabled = false,
   iconLeft, iconRight, fullWidth = false, haptic = 'medium', onPress, className, children,
 }: ButtonProps) {
+  const { colors, shadow } = useTheme();
   const isDisabled = disabled || loading;
+  // El spinner tiene que contrastar con el fondo del botón: blanco sobre los sólidos, gris
+  // medio sobre los que van sobre superficie.
+  const spinColor = variant === 'primary' || variant === 'danger' ? '#fff' : colors.slate[600];
   return (
     <PressableScale
       onPress={onPress}
@@ -57,7 +58,7 @@ export function Button({
         className,
       )}
     >
-      {loading ? <Spinner size={size === 'sm' ? 14 : 16} color={SPIN[variant]} /> : iconLeft}
+      {loading ? <Spinner size={size === 'sm' ? 14 : 16} color={spinColor} /> : iconLeft}
       {typeof children === 'string'
         ? <Text className={cn('font-semibold', SIZE_TXT[size], LABEL[variant])}>{children}</Text>
         : children}

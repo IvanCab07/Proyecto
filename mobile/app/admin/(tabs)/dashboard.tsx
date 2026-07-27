@@ -4,12 +4,15 @@ import Animated from 'react-native-reanimated';
 import { useAllTurnos, useUpdateTurnoStatus } from '../../../hooks';
 import {
   Card, StatCard, StatusBadge, Chip, Sheet, Button, Textarea, ScreenHeader, EmptyState, Skeleton, toast,
+  HoraTurno,
   IconList, IconClock, IconCalendarCheck, IconCheckCircle, IconCalendar, IconRefresh,
 } from '../../../components/ui';
 import { NotificationBell } from '../../../components/NotificationBell';
+import { ThemeToggle } from '../../../components/ThemeToggle';
 import { PressableScale, stagger } from '../../../lib/motion';
-import { colors, STATUS, type TurnoStatus } from '../../../lib/theme';
-import { formatFechaCorta, formatFechaLarga } from '../../../lib/format';
+import { type TurnoStatus } from '../../../lib/theme';
+import { useTheme } from '../../../lib/useTheme';
+import { formatFechaLarga } from '../../../lib/format';
 import type { Turno } from '../../../services';
 
 const FILTERS = ['TODOS', 'PENDIENTE', 'CONFIRMADO', 'COMPLETADO', 'CANCELADO'];
@@ -22,6 +25,7 @@ const NEXT: Record<string, { label: string; status: TurnoStatus }[]> = {
 };
 
 export default function AdminDashboard() {
+  const { colors, STATUS } = useTheme();
   const [filter, setFilter] = useState('TODOS');
   const [modalTurno, setModalTurno] = useState<Turno | null>(null);
   const [selStatus, setSelStatus] = useState<TurnoStatus | ''>('');
@@ -74,7 +78,16 @@ export default function AdminDashboard() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.canvas }}>
-      <ScreenHeader eyebrow={formatFechaLarga(new Date().toISOString())} title="Panel de control" right={<NotificationBell />} />
+      <ScreenHeader
+        eyebrow={formatFechaLarga(new Date().toISOString())}
+        title="Panel de control"
+        right={
+          <View className="flex-row items-center gap-2">
+            <ThemeToggle />
+            <NotificationBell />
+          </View>
+        }
+      />
 
       {isLoading ? (
         <View className="px-4">{header}{[0, 1, 2].map(i => <Skeleton key={i} className="h-32 rounded-card mb-3" />)}</View>
@@ -103,9 +116,9 @@ export default function AdminDashboard() {
                 const sel = selStatus === opt.status;
                 const tone = STATUS[opt.status];
                 return (
-                  <PressableScale key={opt.status} onPress={() => setSelStatus(opt.status)} haptic="select"
-                    style={{ borderWidth: 1.5, borderColor: sel ? tone.strip : colors.slate[200], backgroundColor: sel ? tone.soft : colors.white }}
-                    className="flex-1 items-center py-3.5 rounded-field">
+                  <PressableScale key={opt.status} fill onPress={() => setSelStatus(opt.status)} haptic="select"
+                    style={{ borderWidth: 1.5, borderColor: sel ? tone.strip : colors.slate[200], backgroundColor: sel ? tone.soft : colors.surface }}
+                    className="items-center py-3.5 rounded-field">
                     <Text className="font-bold text-sm" style={{ color: sel ? tone.pillText : colors.slate[600] }}>{opt.label}</Text>
                   </PressableScale>
                 );
@@ -133,12 +146,12 @@ function InfoBox({ tone, label, text }: { tone: { soft: string; DEFAULT: string;
 }
 
 function AdminTurnoCard({ item, index, onChangeStatus }: { item: Turno; index: number; onChangeStatus: () => void }) {
-  const s = STATUS[item.status] ?? STATUS.PENDIENTE;
+  const { colors } = useTheme();
   const nextOpts = NEXT[item.status] ?? [];
   return (
     <Animated.View entering={stagger(index)}>
       <Card className="overflow-hidden flex-row">
-        <View style={{ width: 4, backgroundColor: s.strip }} />
+        <HoraTurno hora={item.hora} fecha={item.fecha} />
         <View className="flex-1 p-4">
           <View className="flex-row items-start justify-between mb-2">
             <View className="flex-1 mr-2">
@@ -147,11 +160,7 @@ function AdminTurnoCard({ item, index, onChangeStatus }: { item: Turno; index: n
             </View>
             <StatusBadge status={item.status} />
           </View>
-          <Text className="text-[13px] text-slate-600 font-medium mb-2">Dr. {item.medico.apellido} · {item.medico.especialidad.nombre}</Text>
-          <View className="flex-row items-center gap-4">
-            <View className="flex-row items-center gap-1.5"><IconCalendarCheck size={12} color={colors.slate[400]} /><Text className="text-[12px] text-slate-500 font-semibold capitalize">{formatFechaCorta(item.fecha)}</Text></View>
-            <View className="flex-row items-center gap-1.5"><IconClock size={12} color={colors.slate[400]} /><Text className="text-[12px] text-slate-600 font-bold">{item.hora} hs</Text></View>
-          </View>
+          <Text className="text-[13px] text-slate-600 font-medium">Dr. {item.medico.apellido} · {item.medico.especialidad.nombre}</Text>
           {item.motivo ? <Text className="text-[12px] text-slate-400 mt-2">Motivo: {item.motivo}</Text> : null}
           {item.notas ? <InfoBox tone={colors.info} label="Nota" text={item.notas} /> : null}
           {item.diagnostico ? <InfoBox tone={{ soft: colors.brand[50], DEFAULT: colors.brand[600], text: colors.brand[800] }} label="Diagnóstico" text={item.diagnostico} /> : null}

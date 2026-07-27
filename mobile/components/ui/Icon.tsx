@@ -1,9 +1,13 @@
 import type { ComponentProps } from 'react';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors } from '../../lib/theme';
+import { useTheme } from '../../lib/useTheme';
 
 // Set de íconos nombrados (espeja web/src/ui/icons.tsx). Trazo fino con Feather;
 // los médicos con MaterialCommunityIcons. Las pantallas nunca importan vector-icons directo.
+//
+// El color por defecto sale del tema, así un <IconHome /> sin props se lee en claro y en
+// oscuro. Cuando el ícono va sobre un fondo de marca (gradiente, botón sólido) hay que pasarle
+// el color a mano, porque ahí el contraste no lo define el tema.
 
 export type IconProps = { size?: number; color?: string };
 
@@ -11,12 +15,14 @@ type FeatherName = ComponentProps<typeof Feather>['name'];
 type MCIName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
 const makeF = (name: FeatherName) =>
-  function FeatherIcon({ size = 20, color = colors.slate[600] }: IconProps) {
-    return <Feather name={name} size={size} color={color} />;
+  function FeatherIcon({ size = 20, color }: IconProps) {
+    const { colors } = useTheme();
+    return <Feather name={name} size={size} color={color ?? colors.slate[600]} />;
   };
 const makeM = (name: MCIName) =>
-  function MCIcon({ size = 20, color = colors.slate[600] }: IconProps) {
-    return <MaterialCommunityIcons name={name} size={size} color={color} />;
+  function MCIcon({ size = 20, color }: IconProps) {
+    const { colors } = useTheme();
+    return <MaterialCommunityIcons name={name} size={size} color={color ?? colors.slate[600]} />;
   };
 
 export const IconHome = makeF('home');
@@ -31,6 +37,8 @@ export const IconFileText = makeF('file-text');
 export const IconFolder = makeF('folder');
 export const IconSettings = makeF('settings');
 export const IconSearch = makeF('search');
+export const IconSend = makeF('send');
+export const IconMessage = makeF('message-circle');
 export const IconChevronRight = makeF('chevron-right');
 export const IconChevronLeft = makeF('chevron-left');
 export const IconChevronDown = makeF('chevron-down');

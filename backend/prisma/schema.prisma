@@ -56,6 +56,7 @@ model User {
   apellido     String                           // Apellido del usuario
   dni          String   @unique                 // DNI (no puede repetirse)
   telefono     String?                          // Teléfono (opcional, el "?" significa eso)
+  fotoUrl      String?  @db.VarChar(255)         // Ruta de la foto de perfil ("/uploads/avatar-x.jpg"), null = iniciales
   role         Role     @default(PATIENT)       // Rol (por defecto es paciente)
   activo       Boolean  @default(true)          // Si la cuenta está habilitada para ingresar
 

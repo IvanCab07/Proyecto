@@ -5,7 +5,7 @@ import { Sheet } from './Sheet';
 import { Button } from './Button';
 import { PressableScale } from '../../lib/motion';
 import { haptic } from '../../lib/haptics';
-import { colors } from '../../lib/theme';
+import { useTheme } from '../../lib/useTheme';
 
 // Confirmaciones y menús de acción con el diseño de la app (reemplazan Alert.alert).
 // Se exponen como funciones tipo Alert.alert para que migrar sea un cambio mínimo:
@@ -35,6 +35,7 @@ export function actionSheet(o: ActionOptions): void {
 }
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
+  const { colors } = useTheme();
   const [confirmOpts, setConfirmOpts] = useState<ConfirmOptions | null>(null);
   const [actionOpts, setActionOpts] = useState<ActionOptions | null>(null);
   const resolver = useRef<((v: boolean) => void) | null>(null);

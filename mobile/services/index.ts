@@ -8,6 +8,8 @@ export interface User {
   apellido: string;
   dni: string;
   telefono?: string;
+  /** Ruta relativa de la foto de perfil ("/uploads/avatar-x.jpg"). null = mostrar iniciales. */
+  fotoUrl?: string | null;
   role: 'PATIENT' | 'ADMIN' | 'MEDICO';
   emailVerified: boolean;
   twoFactorEnabled: boolean;
@@ -118,6 +120,23 @@ export interface CalificacionesAdmin {
   promediosPorMedico: PromedioMedico[];
 }
 
+/**
+ * Lo que devuelve GET /calificaciones/medico. El backend ya mandaba `distribucion`,
+ * `atendidos` y `tasaRespuesta` desde siempre; el tipo de acá no los declaraba y la app
+ * los estaba descartando.
+ */
+export interface CalificacionesMedico {
+  calificaciones: CalificacionDetalle[];
+  promedio: number;
+  cantidad: number;
+  /** Cuántas reseñas hay de cada puntaje. Los 5 tramos vienen siempre, con 0 si no hubo. */
+  distribucion: Record<1 | 2 | 3 | 4 | 5, number>;
+  /** Turnos COMPLETADOS: la base sobre la que se calcula tasaRespuesta. */
+  atendidos: number;
+  /** Porcentaje entero (0-100) de turnos atendidos que dejaron reseña. */
+  tasaRespuesta: number;
+}
+
 export interface Medico {
   id: string;
   nombre: string;
@@ -136,6 +155,9 @@ export interface CreateMedicoDTO {
 
 export interface Estudio {
   id: string;
+  pacienteId: string;
+  /** Quién lo subió. El médico solo puede borrar los que subió él (lo valida el backend). */
+  subidoPorId?: string | null;
   titulo: string;
   descripcion?: string;
   archivoUrl: string;
@@ -149,7 +171,9 @@ export interface Receta {
   dosis: string;
   indicacion: string;
   fechaEmision: string;
-  validoHasta?: string;
+  // Toda receta vence: la columna es NOT NULL y el backend completa 30 días si el emisor no
+  // manda la fecha. Era opcional acá por arrastre de antes de esa migración.
+  validoHasta: string;
   medico: {
     nombre: string;
     apellido: string;
@@ -182,6 +206,7 @@ export interface Cuenta {
   apellido: string;
   dni: string;
   telefono?: string;
+  fotoUrl?: string | null;
   role: 'PATIENT' | 'ADMIN' | 'MEDICO';
   activo: boolean;
   createdAt: string;
@@ -257,6 +282,17 @@ export const authService = {
     const res = await api.patch<{ message: string }>('/auth/cambiar-password', data);
     return res.data;
   },
+
+  // ── Foto de perfil ──
+  // Los dos devuelven el usuario completo, así que alcanza con pisar el del store.
+  // El FormData lleva la imagen bajo el campo "foto" (lo exige uploadImagen.middleware).
+  subirFoto: (formData: FormData) =>
+    api.post<User>('/auth/perfil/foto', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(r => r.data),
+
+  eliminarFoto: () =>
+    api.delete<User>('/auth/perfil/foto').then(r => r.data),
 
   logout: async () => {
     await SecureStore.deleteItemAsync('auth_token');
@@ -349,6 +385,9 @@ export const estudiosService = {
 
   porPaciente: (pacienteId: string) =>
     api.get<Estudio[]>(`/estudios/paciente/${pacienteId}`).then(r => r.data),
+
+  eliminar: (id: string) =>
+    api.delete<{ message: string }>(`/estudios/${id}`).then(r => r.data),
 };
 
 export const recetasService = {
@@ -361,6 +400,10 @@ export const recetasService = {
   // Recetas emitidas por el médico logueado
   delMedico: () =>
     api.get<Receta[]>('/recetas/medico').then(r => r.data),
+
+  // El backend solo deja borrar las que emitió el propio médico (el admin, cualquiera)
+  eliminar: (id: string) =>
+    api.delete<{ message: string }>(`/recetas/${id}`).then(r => r.data),
 };
 
 export const usersService = {
@@ -393,7 +436,7 @@ export const calificacionesService = {
   listadoAdmin: () =>
     api.get<CalificacionesAdmin>('/calificaciones').then(r => r.data),
   miMedico: () =>
-    api.get<{ calificaciones: CalificacionDetalle[]; promedio: number; cantidad: number }>('/calificaciones/medico').then(r => r.data),
+    api.get<CalificacionesMedico>('/calificaciones/medico').then(r => r.data),
 };
 
 export const especialidadesService = {

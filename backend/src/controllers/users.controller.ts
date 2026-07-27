@@ -15,6 +15,7 @@ const USER_SELECT = {
   apellido: true,
   dni: true,
   telefono: true,
+  fotoUrl: true,
   role: true,
   activo: true,
   motivoBaja: true,

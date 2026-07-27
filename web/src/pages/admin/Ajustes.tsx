@@ -8,11 +8,11 @@ import { useActualizarPerfil, useCambiarPassword } from '../../hooks';
 import { PageTransition } from '../../components/PageTransition';
 import { SeguridadCard } from '../../components/SeguridadCard';
 import { Card, Button, Dialog, Input, PasswordInput, PageHeader } from '../../ui';
+import { FotoPerfil } from '../../components/FotoPerfil';
 import {
   IconEdit, IconKey, IconAlert, IconIdCard, IconPhone, IconShield, IconLogout,
   IconUsers, IconStethoscope, IconTag, IconChart, IconChevronRight, IconCalendar,
 } from '../../ui/icons';
-import { iniciales } from '../../lib/format';
 import {
   LIMITES, limpiar, sinError, formatearTelefono,
   validarNombre, validarTelefono, validarPassword, validarConfirmacion,
@@ -127,12 +127,7 @@ export default function AdminAjustes() {
         <Card className="overflow-hidden lg:row-span-2">
           <div className="gradient-card h-20" />
           <div className="px-6 pb-6">
-            <div className="flex items-end gap-4 -mt-8">
-              <div className="w-16 h-16 rounded-2xl bg-mint-grad text-rail grid place-items-center font-bold text-2xl select-none shrink-0 ring-4 ring-surface shadow-glow-mint">
-                {iniciales(user?.nombre, user?.apellido)}
-              </div>
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-pill bg-rail text-rail-fg mb-1">Admin</span>
-            </div>
+            <FotoPerfil etiquetaRol="Admin" />
             <p className="font-bold text-slate-900 text-lg tracking-tightish leading-tight truncate mt-3">
               {user?.nombre} {user?.apellido}
             </p>

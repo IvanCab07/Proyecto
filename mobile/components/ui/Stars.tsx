@@ -1,8 +1,6 @@
 import { View, Pressable } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-
-const AMBER = '#F59E0B';
-const EMPTY = '#CBD5E1';
+import { useTheme } from '../../lib/useTheme';
 
 interface StarsProps {
   /** Puntaje actual (1–5). En modo lectura usa el redondeo para pintar. */
@@ -18,7 +16,10 @@ interface StarsProps {
  * Estrellas reutilizables (espeja web/src/ui/Stars.tsx). Sin `onChange` es de solo
  * lectura; con `onChange` permite elegir de 1 a 5 tocando.
  */
-export function Stars({ value, onChange, size = 20, color = AMBER }: StarsProps) {
+export function Stars({ value, onChange, size = 20, color }: StarsProps) {
+  const { colors } = useTheme();
+  const lleno = color ?? colors.amber[500];
+  const vacio = colors.slate[300];
   const interactive = typeof onChange === 'function';
   const rounded = Math.round(value);
 
@@ -30,7 +31,7 @@ export function Stars({ value, onChange, size = 20, color = AMBER }: StarsProps)
           <MaterialCommunityIcons
             name={filled ? 'star' : 'star-outline'}
             size={size}
-            color={filled ? color : EMPTY}
+            color={filled ? lleno : vacio}
           />
         );
         if (!interactive) return <View key={n}>{icon}</View>;

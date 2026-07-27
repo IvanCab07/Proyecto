@@ -1,20 +1,24 @@
 import { useState } from 'react';
 import { View, Text } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Link, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useAuthStore } from '../../hooks/useAuthStore';
-import { Logo, Input, PasswordInput, Button, toast, IconMail, IconLock, KeyboardAwareScrollView } from '../../components/ui';
-import { gradients, colors } from '../../lib/theme';
+import {
+  Input, PasswordInput, Button, toast,
+  IconMail, IconLock, IconArrowRight, KeyboardAwareScrollView,
+} from '../../components/ui';
+import { AuthHero, HeadlineSalud } from '../../components/AuthHero';
+import { ThemeToggle } from '../../components/ThemeToggle';
+import { useTheme } from '../../lib/useTheme';
+import { homePath } from '../../lib/nav';
 import { apiError } from '../../lib/apiError';
 
 export default function LoginScreen() {
+  const { colors } = useTheme();
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const { login, isLoading } = useAuthStore();
   const router                  = useRouter();
-  const insets                  = useSafeAreaInsets();
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -28,11 +32,7 @@ export default function LoginScreen() {
         return;
       }
       const { user } = useAuthStore.getState();
-      router.replace(
-        user?.role === 'ADMIN' ? '/admin/dashboard'
-          : user?.role === 'MEDICO' ? '/medico/inicio'
-            : '/patient/inicio',
-      );
+      router.replace(homePath(user?.role) as never);
     } catch (err) {
       toast.error(apiError(err, 'Verificá tus credenciales'));
     }
@@ -41,50 +41,64 @@ export default function LoginScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.rail }}>
       <KeyboardAwareScrollView contentContainerStyle={{ flexGrow: 1 }}>
-          <LinearGradient colors={gradients.railHero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ paddingTop: insets.top + 44, paddingBottom: 40, alignItems: 'center' }}>
-            <Logo size={72} />
-            <Text className="text-white font-bold text-[28px] mt-4" style={{ letterSpacing: -0.5 }}>Hospital</Text>
-            <Text className="text-slate-400 text-sm mt-1">Sistema de gestión hospitalaria</Text>
-          </LinearGradient>
+        <AuthHero
+          image="login"
+          headline={<HeadlineSalud />}
+          tagline="Reservá turnos, seguí tus recetas y llevá tus estudios encima."
+          right={<ThemeToggle onDark />}
+        />
 
-          <Animated.View entering={FadeInDown.duration(400)} className="flex-1 bg-canvas rounded-t-[32px] -mt-6 px-6 pt-7 pb-10">
-            <Text className="text-[26px] font-bold text-slate-900" style={{ letterSpacing: -0.5 }}>Iniciar sesión</Text>
-            <Text className="text-slate-400 text-sm mt-1 mb-6">Ingresá con tu cuenta registrada</Text>
+        {/* La hoja monta sobre el hero: el -mt-7 la solapa para que el redondeo se coma el
+            borde del degradado en lugar de dejar una línea. */}
+        <Animated.View
+          entering={FadeInDown.duration(400)}
+          className="flex-1 bg-canvas rounded-t-[28px] -mt-7 px-6 pt-7 pb-10"
+        >
+          <Text className="text-[26px] font-bold text-slate-900" style={{ letterSpacing: -0.52 }}>
+            Bienvenido de nuevo
+          </Text>
+          <Text className="text-slate-500 text-sm mt-1.5 mb-6">
+            Ingresá con tu cuenta para ver tus turnos
+          </Text>
 
-            <Input
-              label="Correo electrónico"
-              iconLeft={<IconMail size={16} color={colors.slate[400]} />}
-              placeholder="tu@email.com"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              value={email}
-              onChangeText={setEmail}
-              className="mb-4"
-            />
-            <PasswordInput
-              label="Contraseña"
-              iconLeft={<IconLock size={16} color={colors.slate[400]} />}
-              placeholder="••••••••"
-              value={password}
-              onChangeText={setPassword}
-              className="mb-2"
-            />
-            <Link href="/auth/forgot-password" asChild>
-              <Text className="text-brand-700 font-semibold text-[13px] text-right mb-5">¿Olvidaste tu contraseña?</Text>
-            </Link>
+          <Input
+            label="Correo electrónico"
+            iconLeft={<IconMail size={16} color={colors.slate[400]} />}
+            placeholder="tu@email.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={email}
+            onChangeText={setEmail}
+            className="mb-4"
+          />
+          <PasswordInput
+            label="Contraseña"
+            iconLeft={<IconLock size={16} color={colors.slate[400]} />}
+            placeholder="••••••••"
+            value={password}
+            onChangeText={setPassword}
+            className="mb-2"
+          />
+          <Link href="/auth/forgot-password" asChild>
+            <Text className="text-brand-700 font-semibold text-[13px] text-right mb-5">¿Olvidaste tu contraseña?</Text>
+          </Link>
 
-            <Button fullWidth size="lg" loading={isLoading} onPress={handleLogin}>Ingresar</Button>
+          <Button
+            fullWidth
+            size="lg"
+            loading={isLoading}
+            onPress={handleLogin}
+            iconRight={<IconArrowRight size={17} color="#fff" />}
+          >
+            Ingresar
+          </Button>
 
-            <View className="flex-row justify-center mt-6">
-              <Text className="text-slate-400 text-sm">¿No tenés cuenta?  </Text>
-              <Link href="/auth/register"><Text className="text-brand-700 font-bold text-sm">Registrate</Text></Link>
-            </View>
-
-            <Link href="/server-config" asChild>
-              <Text className="text-slate-400 text-[13px] text-center mt-5">Configurar servidor</Text>
-            </Link>
-          </Animated.View>
+          <View className="flex-row justify-center mt-6">
+            <Text className="text-slate-500 text-sm">¿No tenés cuenta?  </Text>
+            <Link href="/auth/register"><Text className="text-brand-700 font-bold text-sm">Registrate</Text></Link>
+          </View>
+        </Animated.View>
       </KeyboardAwareScrollView>
     </View>
   );

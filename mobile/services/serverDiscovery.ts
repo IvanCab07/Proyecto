@@ -82,7 +82,7 @@ export async function probe(url: string, timeoutMs?: number): Promise<ProbeResul
 }
 
 // Prueba todas las candidatas en paralelo y devuelve la de mayor prioridad que respondió,
-// junto con el detalle de cada intento (para mostrarlo en "Configurar servidor")
+// junto con el detalle de cada intento (queda en el store para diagnosticar)
 export async function discoverServer(): Promise<{ url: string | null; tried: ProbeResult[] }> {
   const saved = await AsyncStorage.getItem(SERVER_URL_KEY);
   const candidates = buildCandidates(saved);
@@ -91,7 +91,7 @@ export async function discoverServer(): Promise<{ url: string | null; tried: Pro
 
   // Si fijaste el backend por env (EXPO_PUBLIC_API_URL), confiamos en esa URL aunque el
   // primer probe haya expirado: un backend remoto puede estar despertando (cold start de
-  // Render free). Así no mandamos al usuario a "Configurar servidor" por una URL correcta
+  // Render free). Así no le decimos al usuario que no hay servidor por una URL correcta
   // que solo respondió lento; el request real la reintenta con un timeout más holgado.
   const envUrl = process.env.EXPO_PUBLIC_API_URL || null;
   return { url: winner?.url ?? envUrl, tried };

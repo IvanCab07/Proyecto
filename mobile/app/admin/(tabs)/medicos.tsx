@@ -7,12 +7,13 @@ import {
   IconStethoscope, IconUserPlus, IconTrash,
 } from '../../../components/ui';
 import { PressableScale, stagger } from '../../../lib/motion';
-import { colors } from '../../../lib/theme';
+import { useTheme } from '../../../lib/useTheme';
 import { apiError } from '../../../lib/apiError';
 
 const FORM_INIT = { nombre: '', apellido: '', matricula: '', especialidadId: '' };
 
 export default function MedicosAdminScreen() {
+  const { colors } = useTheme();
   const { data: medicos, isLoading, isRefetching, refetch } = useTodosMedicos();
   const { data: especialidades } = useEspecialidades();
   const crearMedico = useCrearMedico();

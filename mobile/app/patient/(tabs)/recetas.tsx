@@ -6,11 +6,12 @@ import {
   IconPill,
 } from '../../../components/ui';
 import { stagger } from '../../../lib/motion';
-import { colors } from '../../../lib/theme';
+import { useTheme } from '../../../lib/useTheme';
 import { formatFecha } from '../../../lib/format';
 import type { Receta } from '../../../services';
 
 export default function RecetasScreen() {
+  const { colors } = useTheme();
   const { data: recetas, isLoading, isRefetching, refetch } = useMisRecetas();
   const count = recetas?.length ?? 0;
 
@@ -48,6 +49,7 @@ export default function RecetasScreen() {
 }
 
 function RecetaCard({ item, index }: { item: Receta; index: number }) {
+  const { colors } = useTheme();
   const vencida = !!item.validoHasta && new Date(item.validoHasta) < new Date();
   return (
     <Animated.View entering={stagger(index)}>

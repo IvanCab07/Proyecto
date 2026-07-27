@@ -1,24 +1,26 @@
 import { useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuthStore } from '../../../hooks/useAuthStore';
+import { useAuthStore } from '../../hooks/useAuthStore';
 import {
   useActualizarPerfil, useCambiarPassword, useMiAgenda, useRecetasMedico,
   useMiFichaMedico, useActualizarMiDisponibilidad,
-} from '../../../hooks';
+} from '../../hooks';
 import {
-  Card, Avatar, Button, Input, PasswordInput, Sheet, StatCard, ScreenHeader, confirm, toast,
+  Card, Button, Input, PasswordInput, Sheet, StatCard, ScreenHeader, confirm, toast, DataRow,
   IconUser, IconEdit, IconLock, IconLogout, IconCalendar, IconCheckCircle, IconPill,
   IconStethoscope, IconStar, IconChevronRight,
-} from '../../../components/ui';
-import { SeguridadSection } from '../../../components/SeguridadSection';
-import { PressableScale } from '../../../lib/motion';
-import { colors } from '../../../lib/theme';
-import { apiError } from '../../../lib/apiError';
+} from '../../components/ui';
+import { FotoPerfilPicker } from '../../components/FotoPerfilPicker';
+import { SeguridadSection } from '../../components/SeguridadSection';
+import { PressableScale } from '../../lib/motion';
+import { useTheme } from '../../lib/useTheme';
+import { apiError } from '../../lib/apiError';
 
 type ActiveModal = 'perfil' | 'password' | null;
 
 function DisponibleSwitch({ checked, onPress, disabled }: { checked: boolean; onPress: () => void; disabled?: boolean }) {
+  const { colors } = useTheme();
   return (
     <Pressable
       onPress={onPress}
@@ -39,6 +41,7 @@ function DisponibleSwitch({ checked, onPress, disabled }: { checked: boolean; on
 }
 
 export default function MedicoPerfil() {
+  const { colors } = useTheme();
   const { user, logout } = useAuthStore();
   const router = useRouter();
   const actualizarPerfil = useActualizarPerfil();
@@ -100,11 +103,11 @@ export default function MedicoPerfil() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.canvas }}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 110 }}>
-        <ScreenHeader eyebrow="Cuenta" title="Mi perfil" pb={48} />
+        <ScreenHeader eyebrow="Cuenta" title="Mi perfil" onBack={() => router.back()} />
 
-        <View className="px-4" style={{ marginTop: -28 }}>
+        <View className="px-4 pt-1">
           <Card className="p-5 items-center">
-            <Avatar nombre={user?.nombre} apellido={user?.apellido} size={80} />
+            <FotoPerfilPicker size={80} />
             <Text className="text-xl font-bold text-slate-900 mt-3" style={{ letterSpacing: -0.4 }}>{user?.nombre} {user?.apellido}</Text>
             <Text className="text-slate-400 text-sm mt-0.5">{user?.email}</Text>
             <View className="bg-brand-50 px-3.5 py-1 rounded-pill mt-2.5"><Text className="text-brand-700 text-[11px] font-bold uppercase tracking-widest">Médico</Text></View>
@@ -141,8 +144,8 @@ export default function MedicoPerfil() {
         <View className="px-4 mt-3.5">
           <PressableScale haptic="select" onPress={() => router.push('/medico/calificaciones')}>
             <Card className="p-4 flex-row items-center">
-              <View className="w-10 h-10 rounded-xl items-center justify-center mr-3" style={{ backgroundColor: '#FFFBEB' }}>
-                <IconStar size={19} color="#F59E0B" />
+              <View className="w-10 h-10 rounded-xl items-center justify-center mr-3" style={{ backgroundColor: colors.amber[50] }}>
+                <IconStar size={19} color={colors.amber[500]} />
               </View>
               <View className="flex-1">
                 <Text className="text-[14px] font-bold text-slate-900">Mis calificaciones</Text>
@@ -196,11 +199,5 @@ export default function MedicoPerfil() {
   );
 }
 
-function DataRow({ label, value, last }: { label: string; value: string; last?: boolean }) {
-  return (
-    <View className={`flex-row justify-between py-3 ${last ? '' : 'border-b border-slate-100'}`}>
-      <Text className="text-slate-400 text-sm">{label}</Text>
-      <Text className="text-slate-900 text-sm font-semibold">{value}</Text>
-    </View>
-  );
-}
+// DataRow estaba copiado acá, en patient/perfil y en admin/ajustes. Ahora sale de
+// components/ui/Rows.tsx.

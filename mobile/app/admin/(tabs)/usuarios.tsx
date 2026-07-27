@@ -1,20 +1,19 @@
 import { useMemo, useState } from 'react';
 import { View, Text, FlatList, RefreshControl } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { useRouter } from 'expo-router';
 import {
   useCuentas, useEspecialidades, useCrearUsuario, useActualizarUsuario, useResetPassword, useEliminarUsuario,
-} from '../../hooks';
-import { useAuthStore } from '../../hooks/useAuthStore';
+} from '../../../hooks';
+import { useAuthStore } from '../../../hooks/useAuthStore';
 import {
   Card, Button, Input, PasswordInput, Chip, Avatar, Sheet, ScreenHeader, SegmentedTabs, EmptyState,
   Skeleton, confirm, actionSheet, toast,
   IconUserPlus, IconUsers, IconSearch, IconKey, IconMore,
-} from '../../components/ui';
-import { PressableScale, stagger } from '../../lib/motion';
-import { colors } from '../../lib/theme';
-import { apiError } from '../../lib/apiError';
-import type { Cuenta } from '../../services';
+} from '../../../components/ui';
+import { PressableScale, stagger } from '../../../lib/motion';
+import { useTheme } from '../../../lib/useTheme';
+import { apiError } from '../../../lib/apiError';
+import type { Cuenta } from '../../../services';
 
 type RoleFilter = 'TODOS' | 'PATIENT' | 'MEDICO' | 'ADMIN';
 type Role = 'PATIENT' | 'MEDICO' | 'ADMIN';
@@ -31,7 +30,7 @@ const EMPTY_FORM = {
 };
 
 export default function UsuariosScreen() {
-  const router = useRouter();
+  const { colors } = useTheme();
   const yo = useAuthStore(s => s.user);
 
   const [tab, setTab] = useState<RoleFilter>('TODOS');
@@ -157,7 +156,8 @@ export default function UsuariosScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.canvas }}>
-      <ScreenHeader eyebrow="Gestión" title="Usuarios" subtitle="Cuentas de pacientes, médicos y admins" onBack={() => router.back()} />
+      {/* Sin botón "atrás": pasó de pantalla apilada a pestaña, así que no hay a dónde volver. */}
+      <ScreenHeader eyebrow="Gestión" title="Usuarios" subtitle="Cuentas de pacientes, médicos y admins" />
 
       <View className="px-4 pt-4 gap-3">
         <Button fullWidth iconLeft={<IconUserPlus size={16} color="#fff" />} onPress={openCrear}>Nuevo usuario</Button>
@@ -201,7 +201,7 @@ export default function UsuariosScreen() {
           renderItem={({ item, index }) => (
             <Animated.View entering={stagger(index)}>
               <Card className="p-3.5 flex-row items-center">
-                <Avatar nombre={item.nombre} apellido={item.apellido} size={44} />
+                <Avatar nombre={item.nombre} apellido={item.apellido} uri={item.fotoUrl} size={44} />
                 <View className="flex-1 ml-3">
                   <View className="flex-row items-center gap-2">
                     <Text className="text-[15px] font-bold text-slate-900 flex-shrink" style={{ letterSpacing: -0.3 }} numberOfLines={1}>{item.nombre} {item.apellido}</Text>

@@ -1,11 +1,12 @@
 import { View, Text } from 'react-native';
 import { cn } from '../../lib/cn';
-import { colors } from '../../lib/theme';
+import { useTheme } from '../../lib/useTheme';
 import { IconCheck } from './Icon';
 
 // Progreso de pasos: círculo centrado en cada celda, conectores simétricos a los lados,
 // etiqueta centrada debajo del círculo.
 export function Stepper({ steps, current }: { steps: string[]; current: number }) {
+  const { colors } = useTheme();
   const last = steps.length - 1;
   return (
     <View className="flex-row">

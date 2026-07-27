@@ -271,7 +271,7 @@ export default function AdminUsuarios() {
                   <TR key={c.id}>
                     <TD>
                       <div className="flex items-center gap-2.5">
-                        <Avatar size="sm" nombre={c.nombre} apellido={c.apellido} />
+                        <Avatar size="sm" nombre={c.nombre} apellido={c.apellido} src={c.fotoUrl} />
                         <span className="font-medium text-slate-900 whitespace-nowrap">
                           {c.nombre} {c.apellido}
                           {c.medico ? <span className="text-slate-400 font-normal"> · Mat. {c.medico.matricula}</span> : null}

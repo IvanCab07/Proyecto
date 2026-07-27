@@ -9,11 +9,11 @@ import {
 import { PageTransition } from '../../components/PageTransition';
 import { SeguridadCard } from '../../components/SeguridadCard';
 import { Card, Button, Dialog, Input, PasswordInput, PageHeader, StatCard } from '../../ui';
+import { FotoPerfil } from '../../components/FotoPerfil';
 import {
   IconEdit, IconKey, IconAlert, IconIdCard, IconPhone, IconMail,
   IconCalendar, IconPill, IconFolder,
 } from '../../ui/icons';
-import { iniciales } from '../../lib/format';
 import { estadoReceta } from '../../lib/fechas';
 import { useFormulario } from '../../lib/useFormulario';
 import {
@@ -127,14 +127,7 @@ export default function PacientePerfil() {
         <Card className="overflow-hidden lg:row-span-2">
           <div className="gradient-card h-20" />
           <div className="px-6 pb-6">
-            <div className="flex items-end gap-4 -mt-8">
-              <div className="w-16 h-16 rounded-2xl bg-mint-grad text-rail grid place-items-center font-bold text-2xl select-none shrink-0 ring-4 ring-surface shadow-glow-mint">
-                {iniciales(user?.nombre, user?.apellido)}
-              </div>
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-pill bg-brand-100 text-brand-800 mb-1">
-                Paciente
-              </span>
-            </div>
+            <FotoPerfil etiquetaRol="Paciente" />
             <p className="font-bold text-slate-900 text-lg tracking-tightish leading-tight truncate mt-3">
               {user?.nombre} {user?.apellido}
             </p>

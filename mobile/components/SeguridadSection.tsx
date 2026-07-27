@@ -3,11 +3,12 @@ import { View, Text, Image } from 'react-native';
 import { useAuthStore } from '../hooks/useAuthStore';
 import { useReenviarVerificacion, use2FASetup, use2FAEnable, use2FADisable } from '../hooks';
 import { Card, Button, Input, Sheet, toast, IconShield, IconCheckCircle, IconAlertCircle } from './ui';
-import { colors } from '../lib/theme';
+import { useTheme } from '../lib/useTheme';
 import { apiError } from '../lib/apiError';
 import type { TwoFactorSetup } from '../services';
 
 export function SeguridadSection() {
+  const { colors } = useTheme();
   const { user } = useAuthStore();
   const reenviar = useReenviarVerificacion();
   const setup = use2FASetup();
