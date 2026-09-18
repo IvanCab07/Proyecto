@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { View, Text } from 'react-native';
 import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, shadow } from '../../lib/theme';
+import { useTheme } from '../../lib/useTheme';
 import { haptic } from '../../lib/haptics';
 import { IconCheckCircle, IconAlertCircle, IconInfo } from './Icon';
 
@@ -14,10 +14,10 @@ import { IconCheckCircle, IconAlertCircle, IconInfo } from './Icon';
 type ToastKind = 'success' | 'error' | 'info';
 type ToastItem = { id: number; kind: ToastKind; text: string };
 
-const TONE: Record<ToastKind, { color: string; Icon: typeof IconInfo }> = {
-  success: { color: colors.success.DEFAULT, Icon: IconCheckCircle },
-  error:   { color: colors.danger.DEFAULT,  Icon: IconAlertCircle },
-  info:    { color: colors.info.DEFAULT,    Icon: IconInfo },
+const ICONO: Record<ToastKind, typeof IconInfo> = {
+  success: IconCheckCircle,
+  error:   IconAlertCircle,
+  info:    IconInfo,
 };
 
 let _push: ((kind: ToastKind, text: string) => void) | null = null;
@@ -28,9 +28,16 @@ export const toast = {
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const { colors, shadow } = useTheme();
   const [items, setItems] = useState<ToastItem[]>([]);
   const insets = useSafeAreaInsets();
   const idRef = useRef(0);
+
+  const TONE: Record<ToastKind, string> = {
+    success: colors.success.DEFAULT,
+    error:   colors.danger.DEFAULT,
+    info:    colors.info.DEFAULT,
+  };
 
   const push = useCallback((kind: ToastKind, text: string) => {
     const id = ++idRef.current;
@@ -48,7 +55,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         style={{ position: 'absolute', top: insets.top + 8, left: 12, right: 12 }}
       >
         {items.map((t) => {
-          const { color, Icon } = TONE[t.kind];
+          const Icon = ICONO[t.kind];
+          const color = TONE[t.kind];
           return (
             <Animated.View
               key={t.id}

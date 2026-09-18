@@ -7,9 +7,12 @@ export interface User {
   apellido: string;
   dni: string;
   telefono?: string;
+  /** Ruta relativa de la foto de perfil ("/uploads/avatar-x.jpg"). null = mostrar iniciales. */
+  fotoUrl?: string | null;
   role: 'PATIENT' | 'ADMIN' | 'MEDICO';
   emailVerified: boolean;
   twoFactorEnabled: boolean;
+  puedeCalificar?: boolean;
 }
 
 export interface LoginDTO { email: string; password: string; }
@@ -28,19 +31,70 @@ export interface Especialidad {
   id: string; nombre: string; _count?: { medicos: number };
 }
 
+export type TurnoStatus = 'PENDIENTE' | 'CONFIRMADO' | 'CANCELADO' | 'COMPLETADO' | 'EN_ESPERA' | 'AUSENTE';
+
+/** Datos mínimos del paciente que vienen embebidos en turnos y recetas. */
+export type PacienteRef = Pick<User, 'id' | 'nombre' | 'apellido' | 'dni'>;
+
 export interface Turno {
   id: string; fecha: string; hora: string; motivo?: string;
-  status: 'PENDIENTE' | 'CONFIRMADO' | 'CANCELADO' | 'COMPLETADO';
-  medico: { id: string; nombre: string; apellido: string; especialidad: { id: string; nombre: string }; };
-  paciente?: Pick<User, 'id' | 'nombre' | 'apellido' | 'dni'>;
+  status: TurnoStatus;
+  esSobreturno?: boolean;
+  // Opcional a propósito: /turnos/medico no incluye el médico (el que consulta es él mismo)
+  medico?: { id: string; nombre: string; apellido: string; especialidad: { id: string; nombre: string }; };
+  paciente?: PacienteRef;
+  calificacion?: Calificacion | null;
   notas?: string; razonCancelacion?: string; diagnostico?: string;
 }
 
-export interface CreateTurnoDTO { medicoId: string; fecha: string; hora: string; motivo?: string; }
+export interface CreateTurnoDTO { medicoId: string; fecha: string; hora: string; motivo?: string; esSobreturno?: boolean; }
+
+export interface Calificacion {
+  id: string;
+  turnoId: string;
+  pacienteId: string;
+  medicoId: string;
+  estrellas: number;
+  comentario?: string | null;
+  createdAt: string;
+}
+
+export interface CreateCalificacionDTO { turnoId: string; estrellas: number; comentario?: string; }
+
+// Una calificación con sus relaciones, como la devuelve el admin
+export interface CalificacionDetalle extends Calificacion {
+  paciente?: { id: string; nombre: string; apellido: string; dni: string };
+  medico?: { id: string; nombre: string; apellido: string; especialidad: { nombre: string } };
+  turno?: { id: string; fecha: string; hora: string };
+}
+
+export interface PromedioMedico {
+  medicoId: string; nombre: string; especialidad: string; promedio: number; cantidad: number;
+}
+
+export interface CalificacionesAdmin {
+  calificaciones: CalificacionDetalle[];
+  promediosPorMedico: PromedioMedico[];
+}
+
+// Panel de calificaciones del médico: además de las reseñas, las métricas de su desempeño
+export interface CalificacionesMedico {
+  calificaciones: CalificacionDetalle[];
+  promedio: number;
+  cantidad: number;
+  /** Cuántas reseñas hay de cada puntaje (las 5 claves siempre presentes). */
+  distribucion: Record<number, number>;
+  /** Turnos completados: la base sobre la que se mide la tasa de respuesta. */
+  atendidos: number;
+  /** Porcentaje de consultas completadas que terminaron en reseña. */
+  tasaRespuesta: number;
+}
 
 export interface Medico {
   id: string; nombre: string; apellido: string; matricula: string;
   disponible: boolean; especialidad: { id: string; nombre: string };
+  // Calificación acumulada. Solo la traen los listados para elegir médico (0/0 si no tiene reseñas).
+  promedio?: number; cantidad?: number;
 }
 
 export interface CreateMedicoDTO {
@@ -50,19 +104,29 @@ export interface CreateMedicoDTO {
 export interface Estudio {
   id: string; titulo: string; descripcion?: string;
   archivoUrl: string; tipoArchivo: string; fecha: string;
+  pacienteId?: string;
+  // Quién lo subió: se usa para decidir si el usuario actual puede eliminarlo.
+  // null en los estudios cargados antes de que existiera el campo.
+  subidoPorId?: string | null;
 }
 
 export interface Receta {
   id: string; medicamento: string; dosis: string; indicacion: string;
-  fechaEmision: string; validoHasta?: string;
-  medico: { nombre: string; apellido: string; especialidad: { nombre: string }; };
-  paciente?: Pick<User, 'id' | 'nombre' | 'apellido' | 'dni'>;
+  // Toda receta vence: el backend completa `validoHasta` si el emisor no lo manda.
+  fechaEmision: string; validoHasta: string;
+  // Opcional: /recetas/medico no incluye el médico (las emitió el que consulta)
+  medico?: { nombre: string; apellido: string; matricula: string; especialidad: { nombre: string }; };
+  paciente?: PacienteRef;
 }
 
 // Cuenta de usuario para la gestión del admin (incluye activo y la ficha de médico si aplica)
 export interface Cuenta {
   id: string; email: string; nombre: string; apellido: string; dni: string;
-  telefono?: string; role: 'PATIENT' | 'ADMIN' | 'MEDICO'; activo: boolean; createdAt: string;
+  telefono?: string; fotoUrl?: string | null;
+  role: 'PATIENT' | 'ADMIN' | 'MEDICO'; activo: boolean; createdAt: string;
+  puedeCalificar: boolean;
+  // Por qué y cuándo se dio de baja la cuenta (null mientras está activa)
+  motivoBaja?: string | null; desactivadoAt?: string | null;
   medico?: { id: string; matricula: string; especialidad: { id: string; nombre: string } } | null;
 }
 export interface CreateUsuarioDTO {
@@ -71,18 +135,22 @@ export interface CreateUsuarioDTO {
 }
 export interface UpdateUsuarioDTO {
   nombre?: string; apellido?: string; telefono?: string;
-  role?: 'PATIENT' | 'ADMIN' | 'MEDICO'; activo?: boolean;
+  role?: 'PATIENT' | 'ADMIN' | 'MEDICO'; activo?: boolean; puedeCalificar?: boolean;
+  motivoBaja?: string;
 }
 
 export interface CreateRecetaDTO {
   pacienteId: string; medicoId?: string; medicamento: string;
-  dosis: string; indicacion: string; validoHasta?: string;
+  dosis: string; indicacion: string; validoHasta: string;
 }
 
 export interface Historial { user: User; turnos: Turno[]; recetas: Receta[]; estudios: Estudio[]; }
 
+export interface TrendPoint { fecha?: string; mes?: string; label: string; total: number; }
+
 export interface AdminStats {
-  turnos: { total: number; pendientes: number; confirmados: number; completados: number; cancelados: number; hoy: number; mes: number; };
+  turnos: { total: number; pendientes: number; confirmados: number; completados: number; cancelados: number; ausentes: number; hoy: number; mes: number; };
+  tendencia: { dias: TrendPoint[]; meses: TrendPoint[] };
   usuarios: { pacientes: number };
   medicos: { disponibles: number };
   topMedicos: { nombre: string; especialidad: string; total: number }[];
@@ -112,6 +180,17 @@ export const authService = {
     const res = await api.patch<{ message: string }>('/auth/cambiar-password', data);
     return res.data;
   },
+
+  // ── Foto de perfil ──
+  // Los dos devuelven el usuario completo, así que alcanza con recargarlo en el store.
+  // El FormData lleva la imagen bajo el campo "foto" (lo exige uploadImagen.middleware).
+  subirFoto: (formData: FormData) =>
+    api.post<User>('/auth/perfil/foto', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(r => r.data),
+
+  eliminarFoto: () =>
+    api.delete<User>('/auth/perfil/foto').then(r => r.data),
   logout: () => { localStorage.removeItem('auth_token'); },
 
   // ── Verificación de email ──
@@ -158,26 +237,34 @@ export const medicosService = {
   porEspecialidad: (id: string) => api.get<Medico[]>(`/medicos/especialidad/${id}`).then(r => r.data),
   todosAdmin: () => api.get<Medico[]>('/medicos/all').then(r => r.data),
   disponibilidad: (medicoId: string, fecha: string) =>
-    api.get<{ horasOcupadas: string[] }>(`/medicos/${medicoId}/disponibilidad`, { params: { fecha } }).then(r => r.data),
+    api.get<{ horasOcupadas: string[]; sobreturnos?: Record<string, number> }>(`/medicos/${medicoId}/disponibilidad`, { params: { fecha } }).then(r => r.data),
   crear: (data: CreateMedicoDTO) => api.post<Medico>('/medicos', data).then(r => r.data),
   actualizar: (id: string, data: Partial<Pick<Medico, 'nombre' | 'apellido' | 'disponible'>>) =>
     api.patch<Medico>(`/medicos/${id}`, data).then(r => r.data),
   eliminar: (id: string) => api.delete(`/medicos/${id}`),
+  // Médico: su propia ficha y disponibilidad
+  miFicha: () => api.get<Medico>('/medicos/mi-ficha').then(r => r.data),
+  actualizarMiDisponibilidad: (disponible: boolean) =>
+    api.patch<Medico>('/medicos/mi-disponibilidad', { disponible }).then(r => r.data),
 };
 
 export const estudiosService = {
   misEstudios: () => api.get<Estudio[]>('/estudios/mis-estudios').then(r => r.data),
+  // El FormData lleva el archivo bajo el campo "archivo" (lo exige multer) y, si el que
+  // sube es un médico, un `pacienteId` para archivarlo a nombre de ese paciente.
   subir: (formData: FormData) =>
     api.post<Estudio>('/estudios/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }).then(r => r.data),
   porPaciente: (pacienteId: string) => api.get<Estudio[]>(`/estudios/paciente/${pacienteId}`).then(r => r.data),
+  eliminar: (id: string) => api.delete<{ message: string }>(`/estudios/${id}`).then(r => r.data),
 };
 
 export const recetasService = {
   misRecetas: () => api.get<Receta[]>('/recetas/mis-recetas').then(r => r.data),
   crear: (data: CreateRecetaDTO) => api.post<Receta>('/recetas', data).then(r => r.data),
   delMedico: () => api.get<Receta[]>('/recetas/medico').then(r => r.data),
+  eliminar: (id: string) => api.delete<{ message: string }>(`/recetas/${id}`).then(r => r.data),
 };
 
 export const usersService = {
@@ -192,6 +279,17 @@ export const usersService = {
   eliminar: (id: string) => api.delete(`/users/${id}`),
 };
 
+export const calificacionesService = {
+  crear: (data: CreateCalificacionDTO) =>
+    api.post<Calificacion>('/calificaciones', data).then(r => r.data),
+  // Admin: todas las calificaciones + promedio por médico
+  listadoAdmin: () =>
+    api.get<CalificacionesAdmin>('/calificaciones').then(r => r.data),
+  // Médico: las calificaciones que recibió, con las métricas de su panel
+  miMedico: () =>
+    api.get<CalificacionesMedico>('/calificaciones/medico').then(r => r.data),
+};
+
 export const especialidadesService = {
   todas: () => api.get<Especialidad[]>('/especialidades').then(r => r.data),
   crear: (nombre: string) => api.post<Especialidad>('/especialidades', { nombre }).then(r => r.data),
@@ -200,7 +298,8 @@ export const especialidadesService = {
 };
 
 export type NotificationType =
-  | 'TURNO_SOLICITADO' | 'TURNO_CONFIRMADO' | 'TURNO_CANCELADO' | 'TURNO_COMPLETADO' | 'RECETA_NUEVA';
+  | 'TURNO_SOLICITADO' | 'TURNO_CONFIRMADO' | 'TURNO_CANCELADO' | 'TURNO_COMPLETADO' | 'RECETA_NUEVA'
+  | 'SOBRETURNO_SOLICITADO' | 'SOBRETURNO_ASIGNADO';
 
 export interface Notification {
   id: string;

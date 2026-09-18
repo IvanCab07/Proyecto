@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { View, Text } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Link, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useAuthStore } from '../../hooks/useAuthStore';
 import {
-  Logo, Input, PasswordInput, Button, toast, KeyboardAwareScrollView,
+  Input, PasswordInput, Button, toast, KeyboardAwareScrollView,
   IconUser, IconMail, IconClipboard, IconPhone, IconLock,
 } from '../../components/ui';
-import { gradients, colors } from '../../lib/theme';
+import { AuthHero } from '../../components/AuthHero';
+import { useTheme } from '../../lib/useTheme';
+import { homePath } from '../../lib/nav';
 import { apiError } from '../../lib/apiError';
 
 const FORM_INIT = { nombre: '', apellido: '', email: '', dni: '', telefono: '', password: '', confirm: '' };
@@ -23,9 +23,9 @@ const FIELDS = [
 ];
 
 export default function RegisterScreen() {
+  const { colors } = useTheme();
   const { register, isLoading } = useAuthStore();
   const router  = useRouter();
-  const insets  = useSafeAreaInsets();
   const [form, setForm] = useState(FORM_INIT);
 
   const update = (key: keyof typeof FORM_INIT) => (val: string) => setForm(prev => ({ ...prev, [key]: val }));
@@ -39,7 +39,9 @@ export default function RegisterScreen() {
     try {
       const { confirm, ...data } = form;
       await register(data);
-      router.replace('/patient/inicio');
+      // El registro siempre crea un paciente, pero la ruta sale de homePath igual: es el único
+      // lugar donde se decide a dónde va cada rol.
+      router.replace(homePath('PATIENT') as never);
     } catch (err) {
       toast.error(apiError(err, 'Intentá de nuevo'));
     }
@@ -48,14 +50,19 @@ export default function RegisterScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.rail }}>
       <KeyboardAwareScrollView contentContainerStyle={{ flexGrow: 1 }}>
-          <LinearGradient colors={gradients.railHero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ paddingTop: insets.top + 28, paddingBottom: 28, alignItems: 'center' }}>
-            <Logo size={56} />
-            <Text className="text-white font-bold text-[22px] mt-3" style={{ letterSpacing: -0.5 }}>Hospital</Text>
-          </LinearGradient>
+          {/* Hero más bajo que en el login: el formulario de registro es largo y conviene que
+              se vean los primeros campos sin scrollear. */}
+          <AuthHero
+            image="register"
+            fraccion={0.3}
+            headline={<>Empezá a cuidarte{'\n'}en serio.</>}
+            // Con deep link no hay pila que desandar y `back()` no haría nada.
+            onBack={() => (router.canGoBack() ? router.back() : router.replace('/auth/login'))}
+          />
 
-          <Animated.View entering={FadeInDown.duration(400)} className="flex-1 bg-canvas rounded-t-[32px] -mt-6 px-6 pt-7 pb-10">
-            <Text className="text-[24px] font-bold text-slate-900" style={{ letterSpacing: -0.5 }}>Crear cuenta</Text>
-            <Text className="text-slate-400 text-sm mt-1 mb-6">Registrate como paciente — es gratis</Text>
+          <Animated.View entering={FadeInDown.duration(400)} className="flex-1 bg-canvas rounded-t-[28px] -mt-7 px-6 pt-7 pb-10">
+            <Text className="text-[24px] font-bold text-slate-900" style={{ letterSpacing: -0.48 }}>Crear cuenta</Text>
+            <Text className="text-slate-500 text-sm mt-1.5 mb-6">Registrate como paciente — es gratis</Text>
 
             {FIELDS.map(f => (
               <Input

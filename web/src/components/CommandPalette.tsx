@@ -76,7 +76,7 @@ function CommandBody({ items, onClose }: { items: CmdItem[]; onClose: () => void
       <motion.div
         variants={overlayFade}
         initial="hidden" animate="visible" exit="hidden"
-        className="absolute inset-0 bg-slate-950/50 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-scrim/60 backdrop-blur-[2px]"
         onClick={onClose}
       />
       <div className="absolute inset-0 flex items-start justify-center p-4 pt-[12vh] pointer-events-none">
@@ -172,12 +172,13 @@ function CommandDialog({ items }: { items: CmdItem[] }) {
   );
 }
 
-function PatientCommand() {
+// Buscador de navegación para paciente y médico: cada uno ve su propio menú.
+function NavCommand({ role }: { role?: string }) {
   const items = useMemo<CmdItem[]>(() =>
-    flatNav(navFor('PATIENT')).map<CmdItem>(n => ({
+    flatNav(navFor(role)).map<CmdItem>(n => ({
       id: `nav-${n.to}`, label: n.label, group: 'Ir a', icon: <n.icon />, to: n.to,
     })),
-  []);
+  [role]);
   return <CommandDialog items={items} />;
 }
 
@@ -191,7 +192,7 @@ function AdminCommand() {
     }));
     const pac = (pacientes ?? []).map<CmdItem>(p => ({
       id: `pac-${p.id}`, label: `${p.nombre} ${p.apellido}`, hint: `DNI ${p.dni}`,
-      group: 'Pacientes', icon: <IconUser />, to: '/admin/pacientes', searchOnly: true,
+      group: 'Pacientes', icon: <IconUser />, to: '/admin/usuarios', searchOnly: true,
     }));
     const med = (medicos ?? []).map<CmdItem>(m => ({
       id: `med-${m.id}`, label: `Dr. ${m.nombre} ${m.apellido}`, hint: m.especialidad.nombre,
@@ -205,5 +206,6 @@ function AdminCommand() {
 
 export function CommandPalette() {
   const role = useAuthStore(s => s.user?.role);
-  return role === 'ADMIN' ? <AdminCommand /> : <PatientCommand />;
+  // El admin tiene su propio buscador (incluye pacientes y médicos); el resto, su menú
+  return role === 'ADMIN' ? <AdminCommand /> : <NavCommand role={role} />;
 }

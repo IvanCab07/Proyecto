@@ -2,6 +2,9 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { HttpError, formatZodError } from '../lib/httpError';
+import {
+  ESTADOS_ABIERTOS, ETIQUETAS, esReversion, puedeTransicionar, type TurnoStatus,
+} from '../lib/turnoEstados';
 import { notify, notifyAdmins } from '../services/notifications.service';
 
 // Fecha corta dd/mm/yyyy para los mensajes de notificación
@@ -9,14 +12,53 @@ const fechaCorta = (d: Date) =>
   `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 
 const turnoSchema = z.object({
-  medicoId: z.string().uuid(),
-  fecha:    z.string().datetime(),
-  hora:     z.string().regex(/^\d{2}:\d{2}$/),
-  motivo:   z.string().optional(),
+  medicoId:     z.string().uuid(),
+  fecha:        z.string().datetime(),
+  hora:         z.string().regex(/^\d{2}:\d{2}$/),
+  motivo:       z.string().optional(),
+  esSobreturno: z.boolean().optional(),  // el paciente acepta tomar un horario ocupado como sobreturno
 });
 
 // Estados válidos de un turno (debe coincidir con el enum TurnoStatus del schema de Prisma)
-const turnoStatusEnum = z.enum(['PENDIENTE', 'CONFIRMADO', 'CANCELADO', 'COMPLETADO']);
+const turnoStatusEnum = z.enum(['PENDIENTE', 'CONFIRMADO', 'CANCELADO', 'COMPLETADO', 'EN_ESPERA', 'AUSENTE']);
+
+// Estados que "ocupan" el horario (un turno activo). Si uno de estos se libera, se cede el sobreturno.
+const ESTADOS_OCUPAN: readonly TurnoStatus[] = ESTADOS_ABIERTOS;
+
+// Límites del día (00:00 a 23:59:59) de una fecha, para buscar por día sin importar la hora exacta guardada.
+function rangoDelDia(fecha: Date): { gte: Date; lte: Date } {
+  const gte = new Date(fecha); gte.setHours(0, 0, 0, 0);
+  const lte = new Date(fecha); lte.setHours(23, 59, 59, 999);
+  return { gte, lte };
+}
+
+// Cede el sobreturno más antiguo en cola para (médico, día, hora) cuando se libera el horario.
+// Lo promueve a CONFIRMADO y avisa al paciente. No lanza: un fallo acá no debe romper la acción que la disparó.
+async function cederSobreturno(medicoId: string, fecha: Date, hora: string): Promise<void> {
+  try {
+    const siguiente = await prisma.turno.findFirst({
+      where: { medicoId, hora, status: 'EN_ESPERA', fecha: rangoDelDia(fecha) },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (!siguiente) return;
+
+    const cedido = await prisma.turno.update({
+      where: { id: siguiente.id },
+      data: { status: 'CONFIRMADO' },
+      include: { medico: { include: { especialidad: true } } },
+    });
+
+    await notify(
+      cedido.pacienteId,
+      'SOBRETURNO_ASIGNADO',
+      '¡Se te cedió el turno!',
+      `Se liberó el turno de ${cedido.medico.especialidad.nombre} con Dr. ${cedido.medico.apellido} del ${fechaCorta(cedido.fecha)} a las ${cedido.hora}. Tu sobreturno fue confirmado: ahora el turno es tuyo.`,
+      { link: '/paciente/turnos', data: { turnoId: cedido.id }, email: true },
+    );
+  } catch (err) {
+    console.error('[cederSobreturno]', err instanceof Error ? err.message : err);
+  }
+}
 
 const updateStatusSchema = z.object({
   status:      turnoStatusEnum,
@@ -31,7 +73,7 @@ export const crearTurno = async (req: Request, res: Response) => {
     return res.status(400).json({ error: formatZodError(result.error) });
   }
 
-  const { medicoId, fecha, hora, motivo } = result.data;
+  const { medicoId, fecha, hora, motivo, esSobreturno } = result.data;
 
   const turnoDate = new Date(fecha);
   const hoy = new Date();
@@ -42,32 +84,61 @@ export const crearTurno = async (req: Request, res: Response) => {
 
   const pacienteId = req.user!.userId;
 
+  // Conflicto = el médico ya tiene un turno activo ese día y hora (se evalúa por día,
+  // igual que la disponibilidad, no por timestamp exacto, para ser consistentes).
   const conflicto = await prisma.turno.findFirst({
     where: {
       medicoId,
-      fecha: new Date(fecha),
+      fecha: rangoDelDia(new Date(fecha)),
       hora,
-      status: { in: ['PENDIENTE', 'CONFIRMADO'] },
+      status: { in: [...ESTADOS_OCUPAN] },
     },
   });
 
-  if (conflicto) {
+  // Si el horario está ocupado: o se rechaza (turno normal) o se anota como sobreturno (en espera).
+  if (conflicto && !esSobreturno) {
     return res.status(409).json({ error: 'El médico ya tiene un turno en ese horario' });
   }
 
+  // El paciente no puede tener dos turnos para el mismo médico/día/hora (incluye sobreturnos propios).
+  const propioEnEseHorario = await prisma.turno.findFirst({
+    where: {
+      pacienteId, medicoId, hora, fecha: rangoDelDia(new Date(fecha)),
+      status: { in: ['PENDIENTE', 'CONFIRMADO', 'EN_ESPERA'] },
+    },
+  });
+  if (propioEnEseHorario) {
+    return res.status(409).json({ error: 'Ya tenés un turno o sobreturno con ese médico en ese horario' });
+  }
+
+  // Sólo es sobreturno si realmente había conflicto; si el horario quedó libre, se crea como turno normal.
+  const comoSobreturno = Boolean(conflicto && esSobreturno);
 
   const turno = await prisma.turno.create({
-    data: { pacienteId, medicoId, fecha: new Date(fecha), hora, motivo },
+    data: {
+      pacienteId, medicoId, fecha: new Date(fecha), hora, motivo,
+      esSobreturno: comoSobreturno,
+      status: comoSobreturno ? 'EN_ESPERA' : 'PENDIENTE',
+    },
     include: { medico: { include: { especialidad: true } } },
   });
 
-  // Avisar a los administradores del nuevo turno
-  await notifyAdmins(
-    'TURNO_SOLICITADO',
-    'Nuevo turno solicitado',
-    `Un paciente solicitó un turno de ${turno.medico.especialidad.nombre} para el ${fechaCorta(turno.fecha)} a las ${turno.hora}.`,
-    { link: '/admin/turnos', data: { turnoId: turno.id } },
-  );
+  // Avisar a los administradores del nuevo turno / sobreturno
+  if (comoSobreturno) {
+    await notifyAdmins(
+      'SOBRETURNO_SOLICITADO',
+      'Nuevo sobreturno en espera',
+      `Un paciente se anotó como sobreturno de ${turno.medico.especialidad.nombre} para el ${fechaCorta(turno.fecha)} a las ${turno.hora}. Quedará confirmado si se libera el horario.`,
+      { link: '/admin/turnos', data: { turnoId: turno.id } },
+    );
+  } else {
+    await notifyAdmins(
+      'TURNO_SOLICITADO',
+      'Nuevo turno solicitado',
+      `Un paciente solicitó un turno de ${turno.medico.especialidad.nombre} para el ${fechaCorta(turno.fecha)} a las ${turno.hora}.`,
+      { link: '/admin/turnos', data: { turnoId: turno.id } },
+    );
+  }
 
   return res.status(201).json(turno);
 };
@@ -77,7 +148,7 @@ export const getMisTurnos = async (req: Request, res: Response) => {
 
   const turnos = await prisma.turno.findMany({
     where: { pacienteId: req.user!.userId },
-    include: { medico: { include: { especialidad: true } } },
+    include: { medico: { include: { especialidad: true } }, calificacion: true },
     orderBy: { fecha: 'desc' },
   });
   return res.json(turnos);
@@ -99,13 +170,16 @@ export const getAllTurnos = async (req: Request, res: Response) => {
 
       ...(statusParsed.success && { status: statusParsed.data }),
 
-      ...(fechaValida && { fecha: fechaDate }),
+      // Por día completo: comparar contra el timestamp exacto nunca coincidía
+      ...(fechaValida && { fecha: rangoDelDia(fechaDate!) }),
     },
     include: {
 
       paciente: { select: { id: true, nombre: true, apellido: true, dni: true } },
 
       medico: { include: { especialidad: true } },
+
+      calificacion: true,
     },
     orderBy: [{ fecha: 'asc' }, { hora: 'asc' }],
   });
@@ -126,7 +200,10 @@ export const getTurnosMedico = async (req: Request, res: Response) => {
   const medicoId = await medicoIdDeUsuario(req.user!.userId);
   const turnos = await prisma.turno.findMany({
     where: { medicoId },
-    include: { paciente: { select: { id: true, nombre: true, apellido: true, dni: true } } },
+    include: {
+      paciente: { select: { id: true, nombre: true, apellido: true, dni: true } },
+      calificacion: true,
+    },
     orderBy: [{ fecha: 'asc' }, { hora: 'asc' }],
   });
   return res.json(turnos);
@@ -141,14 +218,60 @@ export const updateTurnoStatus = async (req: Request, res: Response) => {
   }
   const { status, notas, diagnostico } = result.data;
 
+  const previo = await prisma.turno.findUnique({
+    where: { id },
+    select: { status: true, medicoId: true, fecha: true, hora: true, calificacion: { select: { id: true } } },
+  });
+  if (!previo) throw new HttpError(404, 'Turno no encontrado');
+
   // Un médico solo puede tocar sus propios turnos; el admin, cualquiera
   if (req.user!.role === 'MEDICO') {
     const medicoId = await medicoIdDeUsuario(req.user!.userId);
-    const propio = await prisma.turno.findUnique({ where: { id } });
-    if (!propio || propio.medicoId !== medicoId) {
+    if (previo.medicoId !== medicoId) {
       throw new HttpError(403, 'Ese turno no pertenece a tu agenda');
     }
   }
+
+  const desde = previo.status as TurnoStatus;
+
+  // Sin cambio real: no reescribimos ni volvemos a notificar al paciente
+  if (desde === status && notas === undefined && diagnostico === undefined) {
+    return res.json(await prisma.turno.findUnique({ where: { id } }));
+  }
+
+  if (desde !== status) {
+    if (!puedeTransicionar(desde, status)) {
+      throw new HttpError(400, `No se puede pasar un turno de ${ETIQUETAS[desde]} a ${ETIQUETAS[status]}`);
+    }
+
+    // Deshacer un turno cerrado exige que nada dependa todavía de ese cierre
+    if (esReversion(desde, status)) {
+      if (previo.calificacion) {
+        throw new HttpError(409, 'Ese turno ya fue calificado por el paciente. No se puede deshacer.');
+      }
+
+      // Al volver a ocupar el horario hay que asegurarse de que no lo haya tomado otro turno
+      // (por ejemplo, un sobreturno que se cedió justo cuando este se canceló).
+      const ocupado = await prisma.turno.findFirst({
+        where: {
+          id: { not: id },
+          medicoId: previo.medicoId,
+          hora: previo.hora,
+          fecha: rangoDelDia(previo.fecha),
+          status: { in: [...ESTADOS_OCUPAN] },
+        },
+        select: { id: true },
+      });
+      if (ocupado) {
+        throw new HttpError(409, 'Ya hay otro turno ocupando ese horario. Reprogramalo antes de deshacer este.');
+      }
+    }
+  }
+
+  // Si el turno ocupaba el horario y ahora se libera (cancelado/ausente), después habrá que ceder el sobreturno.
+  const liberaHorario =
+    (status === 'CANCELADO' || status === 'AUSENTE') &&
+    (ESTADOS_OCUPAN as readonly string[]).includes(desde);
 
   const turno = await prisma.turno.update({
     where: { id },
@@ -159,18 +282,33 @@ export const updateTurnoStatus = async (req: Request, res: Response) => {
     },
   });
 
-  // Avisar al paciente según el nuevo estado de su turno
+  // Avisar al paciente, pero solo si el estado cambió de verdad: guardar únicamente
+  // notas o diagnóstico no es algo que tenga que notificarse.
   const fechaTxt = `${fechaCorta(turno.fecha)} a las ${turno.hora}`;
   const ctx = { link: '/paciente/turnos', data: { turnoId: turno.id } };
-  if (turno.status === 'CONFIRMADO') {
-    await notify(turno.pacienteId, 'TURNO_CONFIRMADO', 'Turno confirmado',
-      `Tu turno del ${fechaTxt} fue confirmado.`, { ...ctx, email: true });
-  } else if (turno.status === 'CANCELADO') {
-    await notify(turno.pacienteId, 'TURNO_CANCELADO', 'Turno cancelado',
-      `Tu turno del ${fechaTxt} fue cancelado.`, { ...ctx, email: true });
-  } else if (turno.status === 'COMPLETADO') {
-    await notify(turno.pacienteId, 'TURNO_COMPLETADO', 'Consulta completada',
-      `Tu turno del ${fechaTxt} se marcó como completado.`, ctx);
+  if (desde !== status) {
+    if (esReversion(desde, status)) {
+      // El médico deshizo el estado: avisamos para que el paciente no quede con la info vieja
+      await notify(turno.pacienteId, 'TURNO_CONFIRMADO', 'Se corrigió el estado de tu turno',
+        `Tu turno del ${fechaTxt} volvió a estado ${ETIQUETAS[status]}.`, ctx);
+    } else if (turno.status === 'CONFIRMADO') {
+      await notify(turno.pacienteId, 'TURNO_CONFIRMADO', 'Turno confirmado',
+        `Tu turno del ${fechaTxt} fue confirmado.`, { ...ctx, email: true });
+    } else if (turno.status === 'CANCELADO') {
+      await notify(turno.pacienteId, 'TURNO_CANCELADO', 'Turno cancelado',
+        `Tu turno del ${fechaTxt} fue cancelado.`, { ...ctx, email: true });
+    } else if (turno.status === 'AUSENTE') {
+      await notify(turno.pacienteId, 'TURNO_CANCELADO', 'Turno marcado como ausente',
+        `Tu turno del ${fechaTxt} se marcó como ausente (no asististe).`, ctx);
+    } else if (turno.status === 'COMPLETADO') {
+      await notify(turno.pacienteId, 'TURNO_COMPLETADO', 'Consulta completada',
+        `Tu turno del ${fechaTxt} se marcó como completado.`, ctx);
+    }
+  }
+
+  // Si se liberó el horario, ceder el sobreturno más antiguo en cola.
+  if (liberaHorario) {
+    await cederSobreturno(turno.medicoId, turno.fecha, turno.hora);
   }
 
   return res.json(turno);
@@ -216,6 +354,11 @@ export const cancelarTurno = async (req: Request, res: Response) => {
       { link: '/medico/agenda', data: { turnoId: turno.id } });
   }
 
+  // Si el turno cancelado ocupaba el horario, ceder el sobreturno más antiguo en cola.
+  if ((ESTADOS_OCUPAN as readonly string[]).includes(turno.status)) {
+    await cederSobreturno(turno.medicoId, turno.fecha, turno.hora);
+  }
+
   return res.json({ message: 'Turno cancelado' });
 };
 
@@ -228,18 +371,56 @@ export const getStats = async (_req: Request, res: Response) => {
   const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
   const finMes    = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59);
 
-  const [total, pendientes, confirmados, completados, cancelados, turnosHoy, turnosMes, totalPacientes, medicosDisp] =
+  const [total, pendientes, confirmados, completados, cancelados, ausentes, turnosHoy, turnosMes, totalPacientes, medicosDisp] =
     await Promise.all([
       prisma.turno.count(),
       prisma.turno.count({ where: { status: 'PENDIENTE' } }),
       prisma.turno.count({ where: { status: 'CONFIRMADO' } }),
       prisma.turno.count({ where: { status: 'COMPLETADO' } }),
       prisma.turno.count({ where: { status: 'CANCELADO' } }),
+      prisma.turno.count({ where: { status: 'AUSENTE' } }),
       prisma.turno.count({ where: { fecha: { gte: inicioHoy, lte: finHoy } } }),
       prisma.turno.count({ where: { fecha: { gte: inicioMes, lte: finMes } } }),
       prisma.user.count({ where: { role: 'PATIENT' } }),
       prisma.medico.count({ where: { disponible: true } }),
     ]);
+
+  // ── Tendencia real (sin datos inventados): se cuentan los turnos por día y por mes
+  // a partir de su fecha, mirando los últimos 6 meses una sola vez.
+  const desde6Meses = new Date(ahora.getFullYear(), ahora.getMonth() - 5, 1);
+  const turnosRango = await prisma.turno.findMany({
+    where: { fecha: { gte: desde6Meses } },
+    select: { fecha: true },
+  });
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const MESES_ABR = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+  // Conteos por día (clave YYYY-MM-DD) y por mes (clave YYYY-MM)
+  const porDiaMap = new Map<string, number>();
+  const porMesMap = new Map<string, number>();
+  for (const { fecha } of turnosRango) {
+    const f = new Date(fecha);
+    const diaKey = `${f.getFullYear()}-${pad(f.getMonth() + 1)}-${pad(f.getDate())}`;
+    const mesKey = `${f.getFullYear()}-${pad(f.getMonth() + 1)}`;
+    porDiaMap.set(diaKey, (porDiaMap.get(diaKey) ?? 0) + 1);
+    porMesMap.set(mesKey, (porMesMap.get(mesKey) ?? 0) + 1);
+  }
+
+  // Últimos 14 días (incluye los días sin turnos en 0 para que la curva no tenga huecos)
+  const dias = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(ahora);
+    d.setDate(d.getDate() - (13 - i));
+    const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    return { fecha: key, label: `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`, total: porDiaMap.get(key) ?? 0 };
+  });
+
+  // Últimos 6 meses
+  const meses = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(ahora.getFullYear(), ahora.getMonth() - (5 - i), 1);
+    const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+    return { mes: key, label: MESES_ABR[d.getMonth()], total: porMesMap.get(key) ?? 0 };
+  });
 
   const topMedicos = await prisma.medico.findMany({
     include: { especialidad: true, _count: { select: { turnos: true } } },
@@ -255,7 +436,8 @@ export const getStats = async (_req: Request, res: Response) => {
   });
 
   return res.json({
-    turnos: { total, pendientes, confirmados, completados, cancelados, hoy: turnosHoy, mes: turnosMes },
+    turnos: { total, pendientes, confirmados, completados, cancelados, ausentes, hoy: turnosHoy, mes: turnosMes },
+    tendencia: { dias, meses },
     usuarios: { pacientes: totalPacientes },
     medicos: { disponibles: medicosDisp },
     topMedicos: topMedicos.map(m => ({

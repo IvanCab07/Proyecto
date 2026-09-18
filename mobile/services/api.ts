@@ -3,8 +3,8 @@ import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getDefaultUrl, probe, SERVER_URL_KEY, ProbeResult } from './serverDiscovery';
 
-// baseURL inicial resuelta sin red; el discovery del arranque (useServerStore)
-// y la pantalla "Configurar servidor" la pueden cambiar en caliente con setApiUrl()
+// baseURL inicial resuelta sin red; el discovery del arranque (useServerStore) la puede
+// cambiar en caliente con setApiUrl()
 let currentApiUrl = getDefaultUrl();
 
 export const api = axios.create({
@@ -41,7 +41,7 @@ api.interceptors.response.use(
     if (!error.response) {
       error.message =
         `No se pudo conectar a ${currentApiUrl}. ` +
-        'Abrí "Configurar servidor" en la pantalla de ingreso y probá con la IP de tu PC.';
+        'Revisá que estés en la misma red Wi-Fi que el servidor de la clínica.';
     }
     if (error.response?.status === 401) {
       await SecureStore.deleteItemAsync('auth_token');

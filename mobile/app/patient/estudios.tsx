@@ -4,20 +4,19 @@ import * as DocumentPicker from 'expo-document-picker';
 import Animated from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useMisEstudios, useSubirEstudio } from '../../hooks';
-import { getApiUrl } from '../../services/api';
+import { urlArchivo } from '../../lib/archivoUrl';
 import {
   Card, Button, Input, Textarea, Sheet, ScreenHeader, EmptyState, Skeleton, toast,
   IconFolder, IconUpload, IconFileText, IconImage, IconExternal, IconPlus,
 } from '../../components/ui';
 import { PressableScale, stagger } from '../../lib/motion';
-import { colors } from '../../lib/theme';
+import { useTheme } from '../../lib/useTheme';
 import { formatFechaLarga } from '../../lib/format';
 import { apiError } from '../../lib/apiError';
 import type { Estudio } from '../../services';
 
-const apiBase = () => getApiUrl().replace(/\/api$/, '');
-
 export default function EstudiosScreen() {
+  const { colors } = useTheme();
   const { data: estudios, isLoading, isRefetching, refetch } = useMisEstudios();
   const subirEstudio = useSubirEstudio();
   const router = useRouter();
@@ -51,7 +50,8 @@ export default function EstudiosScreen() {
   };
 
   const handleOpenFile = async (archivoUrl: string) => {
-    const url = `${apiBase()}${archivoUrl}`;
+    const url = urlArchivo(archivoUrl);
+    if (!url) return;
     try {
       const canOpen = await Linking.canOpenURL(url);
       if (canOpen) await Linking.openURL(url);
@@ -116,6 +116,7 @@ export default function EstudiosScreen() {
 }
 
 function EstudioCard({ item, index, onOpen }: { item: Estudio; index: number; onOpen: () => void }) {
+  const { colors } = useTheme();
   const isPdf = item.tipoArchivo?.includes('pdf');
   const tone = isPdf ? colors.danger : colors.info;
   return (

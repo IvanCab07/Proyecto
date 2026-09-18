@@ -2,7 +2,10 @@
 
 export const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 export const MESES_LARGO = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-export const DIAS_SEMANA = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+// Los nombres de los días viven en lib/fechas.ts como DIAS_SEMANA_LUNES (la semana arranca en
+// lunes, que es como se arman los calendarios de acá). Antes había acá un DIAS_SEMANA que
+// empezaba en domingo y los dos calendarios de la app mostraban semanas distintas.
 
 export function formatFecha(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' });

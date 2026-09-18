@@ -3,19 +3,23 @@ import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { apiError } from '../../lib/apiError';
-import { api, apiUrl } from '../../services/api';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useActualizarPerfil, useCambiarPassword } from '../../hooks';
 import { PageTransition } from '../../components/PageTransition';
 import { SeguridadCard } from '../../components/SeguridadCard';
 import { Card, Button, Dialog, Input, PasswordInput, PageHeader } from '../../ui';
+import { FotoPerfil } from '../../components/FotoPerfil';
 import {
   IconEdit, IconKey, IconAlert, IconIdCard, IconPhone, IconShield, IconLogout,
-  IconActivity, IconCheckCircle, IconUsers, IconStethoscope, IconTag, IconChart, IconChevronRight,
+  IconUsers, IconStethoscope, IconTag, IconChart, IconChevronRight, IconCalendar,
 } from '../../ui/icons';
-import { iniciales } from '../../lib/format';
+import {
+  LIMITES, limpiar, sinError, formatearTelefono,
+  validarNombre, validarTelefono, validarPassword, validarConfirmacion,
+} from '../../lib/validaciones';
 
 const QUICK_LINKS = [
+  { to: '/admin/turnos', label: 'Turnos', desc: 'Agenda del hospital', icon: <IconCalendar /> },
   { to: '/admin/usuarios', label: 'Usuarios', desc: 'Cuentas y roles', icon: <IconShield /> },
   { to: '/admin/medicos', label: 'Médicos', desc: 'Altas y disponibilidad', icon: <IconStethoscope /> },
   { to: '/admin/especialidades', label: 'Especialidades', desc: 'Catálogo médico', icon: <IconTag /> },
@@ -34,11 +38,28 @@ export default function AdminAjustes() {
   const [pwdForm, setPwdForm] = useState({ passwordActual: '', passwordNueva: '', confirm: '' });
   const [perfilError, setPerfilError] = useState('');
   const [pwdError, setPwdError] = useState('');
-  const [conn, setConn] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle');
+  const [errores, setErrores] = useState<Record<string, string>>({});
+
+  // Valida un campo del perfil y guarda (o limpia) su mensaje de error
+  const validarCampo = (campo: keyof typeof perfilForm, valor: string) => {
+    const msg =
+      campo === 'nombre' ? validarNombre(valor, 'El nombre')
+      : campo === 'apellido' ? validarNombre(valor, 'El apellido')
+      : validarTelefono(valor);
+    setErrores(e => (msg ? { ...sinError(e, campo), [campo]: msg } : sinError(e, campo)));
+    return msg;
+  };
+
+  const setCampo = (campo: keyof typeof perfilForm) => (valor: string) => {
+    setPerfilForm(p => ({ ...p, [campo]: valor }));
+    // Al escribir se limpia el error del campo; se vuelve a validar en el blur
+    setErrores(e => sinError(e, campo));
+  };
 
   const abrirPerfil = () => {
     setPerfilForm({ nombre: user?.nombre ?? '', apellido: user?.apellido ?? '', telefono: user?.telefono ?? '' });
     setPerfilError('');
+    setErrores({});
     setModalPerfil(true);
   };
   const abrirPwd = () => {
@@ -50,8 +71,23 @@ export default function AdminAjustes() {
   const handlePerfil = async (e: FormEvent) => {
     e.preventDefault();
     setPerfilError('');
+
+    const nuevos: Record<string, string> = {};
+    const nombre = validarNombre(perfilForm.nombre, 'El nombre');
+    const apellido = validarNombre(perfilForm.apellido, 'El apellido');
+    const telefono = validarTelefono(perfilForm.telefono);
+    if (nombre) nuevos.nombre = nombre;
+    if (apellido) nuevos.apellido = apellido;
+    if (telefono) nuevos.telefono = telefono;
+    setErrores(nuevos);
+    if (Object.keys(nuevos).length) return;
+
     try {
-      await actualizarPerfil.mutateAsync({ nombre: perfilForm.nombre, apellido: perfilForm.apellido, telefono: perfilForm.telefono || undefined });
+      await actualizarPerfil.mutateAsync({
+        nombre: limpiar(perfilForm.nombre),
+        apellido: limpiar(perfilForm.apellido),
+        telefono: perfilForm.telefono.trim() || undefined,
+      });
       toast.success('Datos actualizados');
       setModalPerfil(false);
     } catch (err) {
@@ -62,8 +98,9 @@ export default function AdminAjustes() {
   const handlePwd = async (e: FormEvent) => {
     e.preventDefault();
     setPwdError('');
-    if (pwdForm.passwordNueva !== pwdForm.confirm) return setPwdError('Las contraseñas no coinciden');
-    if (pwdForm.passwordNueva.length < 6) return setPwdError('La nueva contraseña debe tener al menos 6 caracteres');
+    const msg = validarPassword(pwdForm.passwordNueva)
+      ?? validarConfirmacion(pwdForm.passwordNueva, pwdForm.confirm);
+    if (msg) return setPwdError(msg);
     try {
       await cambiarPassword.mutateAsync({ passwordActual: pwdForm.passwordActual, passwordNueva: pwdForm.passwordNueva });
       toast.success('Contraseña actualizada');
@@ -75,12 +112,6 @@ export default function AdminAjustes() {
 
   const handleLogout = () => { logout(); navigate('/login', { replace: true }); };
 
-  const probarConexion = async () => {
-    setConn('testing');
-    try { await api.get('/health'); setConn('ok'); }
-    catch { setConn('fail'); }
-  };
-
   const rows = [
     { label: 'DNI', value: user?.dni || '—', icon: <IconIdCard /> },
     { label: 'Teléfono', value: user?.telefono || 'No registrado', icon: <IconPhone /> },
@@ -89,19 +120,14 @@ export default function AdminAjustes() {
 
   return (
     <PageTransition>
-      <PageHeader title="Ajustes" description="Tu cuenta y la configuración del sistema." />
+      <PageHeader title="Ajustes" description="Tu cuenta y seguridad." />
 
       <div className="grid gap-4 lg:grid-cols-3 items-start">
         {/* Cuenta */}
         <Card className="overflow-hidden lg:row-span-2">
-          <div className="bg-rail bg-gradient-to-br from-[#0C2422] via-rail to-[#0A1615] h-20" />
+          <div className="gradient-card h-20" />
           <div className="px-6 pb-6">
-            <div className="flex items-end gap-4 -mt-8">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 text-white grid place-items-center font-bold text-2xl select-none shrink-0 ring-4 ring-surface shadow-glow-brand">
-                {iniciales(user?.nombre, user?.apellido)}
-              </div>
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-pill bg-slate-900 text-white mb-1">Admin</span>
-            </div>
+            <FotoPerfil etiquetaRol="Admin" />
             <p className="font-bold text-slate-900 text-lg tracking-tightish leading-tight truncate mt-3">
               {user?.nombre} {user?.apellido}
             </p>
@@ -136,30 +162,6 @@ export default function AdminAjustes() {
           <SeguridadCard />
         </div>
 
-        {/* Sistema / Conexión */}
-        <Card className="p-5 lg:col-span-2">
-          <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><IconActivity className="w-4 h-4 text-slate-400" /> Sistema y conexión</h3>
-          <div className="space-y-3 text-sm">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-slate-500">Versión</span>
-              <span className="text-slate-900 font-medium">1.0.0</span>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-slate-500">Entorno</span>
-              <span className="text-slate-900 font-medium">{import.meta.env.MODE}</span>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-slate-500 shrink-0">Servidor (API)</span>
-              <span className="text-slate-900 font-medium font-mono text-xs truncate">{apiUrl}</span>
-            </div>
-            <div className="flex items-center gap-3 pt-1">
-              <Button variant="secondary" size="sm" loading={conn === 'testing'} onClick={probarConexion}>Probar conexión</Button>
-              {conn === 'ok' && <span className="inline-flex items-center gap-1.5 text-success-text text-sm font-medium"><IconCheckCircle className="w-4 h-4" /> Servidor alcanzable</span>}
-              {conn === 'fail' && <span className="inline-flex items-center gap-1.5 text-danger-text text-sm font-medium"><IconAlert className="w-4 h-4" /> Sin conexión</span>}
-            </div>
-          </div>
-        </Card>
-
         {/* Accesos rápidos */}
         <Card className="p-5 lg:col-span-3">
           <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><IconUsers className="w-4 h-4 text-slate-400" /> Accesos rápidos</h3>
@@ -184,9 +186,35 @@ export default function AdminAjustes() {
 
       <Dialog open={modalPerfil} onClose={() => setModalPerfil(false)} title="Editar datos">
         <form onSubmit={handlePerfil} className="space-y-4">
-          <Input label="Nombre" required value={perfilForm.nombre} onChange={e => setPerfilForm(p => ({ ...p, nombre: e.target.value }))} />
-          <Input label="Apellido" required value={perfilForm.apellido} onChange={e => setPerfilForm(p => ({ ...p, apellido: e.target.value }))} />
-          <Input label="Teléfono" hint="Opcional" value={perfilForm.telefono} onChange={e => setPerfilForm(p => ({ ...p, telefono: e.target.value }))} />
+          <Input
+            label="Nombre"
+            required
+            maxLength={LIMITES.nombre}
+            value={perfilForm.nombre}
+            error={errores.nombre}
+            onChange={e => setCampo('nombre')(e.target.value)}
+            onBlur={e => validarCampo('nombre', e.target.value)}
+          />
+          <Input
+            label="Apellido"
+            required
+            maxLength={LIMITES.apellido}
+            value={perfilForm.apellido}
+            error={errores.apellido}
+            onChange={e => setCampo('apellido')(e.target.value)}
+            onBlur={e => validarCampo('apellido', e.target.value)}
+          />
+          <Input
+            label="Teléfono"
+            type="tel"
+            hint="Opcional"
+            placeholder="11 1234-5678"
+            maxLength={LIMITES.telefono}
+            value={perfilForm.telefono}
+            error={errores.telefono}
+            onChange={e => setCampo('telefono')(formatearTelefono(e.target.value))}
+            onBlur={e => validarCampo('telefono', e.target.value)}
+          />
           {perfilError && (
             <div className="flex items-center gap-2.5 bg-danger-soft text-danger-text rounded-field px-3.5 py-3 text-[13px] font-medium">
               <IconAlert className="shrink-0" />
@@ -203,8 +231,8 @@ export default function AdminAjustes() {
       <Dialog open={modalPwd} onClose={() => setModalPwd(false)} title="Cambiar contraseña">
         <form onSubmit={handlePwd} className="space-y-4">
           <PasswordInput label="Contraseña actual" required autoComplete="current-password" value={pwdForm.passwordActual} onChange={e => setPwdForm(p => ({ ...p, passwordActual: e.target.value }))} />
-          <PasswordInput label="Nueva contraseña" required autoComplete="new-password" hint="Mínimo 6 caracteres" value={pwdForm.passwordNueva} onChange={e => setPwdForm(p => ({ ...p, passwordNueva: e.target.value }))} />
-          <PasswordInput label="Confirmar nueva contraseña" required autoComplete="new-password" value={pwdForm.confirm} onChange={e => setPwdForm(p => ({ ...p, confirm: e.target.value }))} />
+          <PasswordInput label="Nueva contraseña" required autoComplete="new-password" maxLength={LIMITES.password} hint={`Mínimo ${LIMITES.passwordMin} caracteres`} value={pwdForm.passwordNueva} onChange={e => setPwdForm(p => ({ ...p, passwordNueva: e.target.value }))} />
+          <PasswordInput label="Confirmar nueva contraseña" required autoComplete="new-password" maxLength={LIMITES.password} value={pwdForm.confirm} onChange={e => setPwdForm(p => ({ ...p, confirm: e.target.value }))} />
           {pwdError && (
             <div className="flex items-center gap-2.5 bg-danger-soft text-danger-text rounded-field px-3.5 py-3 text-[13px] font-medium">
               <IconAlert className="shrink-0" />

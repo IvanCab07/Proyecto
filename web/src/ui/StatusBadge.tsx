@@ -8,6 +8,8 @@ const MAP: Record<Status, { label: string; pill: string; dot: string }> = {
   CONFIRMADO: { label: 'Confirmado', pill: 'bg-brand-100 text-brand-800',       dot: 'bg-brand-600' },
   COMPLETADO: { label: 'Completado', pill: 'bg-success-soft text-success-text', dot: 'bg-success' },
   CANCELADO:  { label: 'Cancelado',  pill: 'bg-danger-soft text-danger-text',   dot: 'bg-danger' },
+  EN_ESPERA:  { label: 'En espera',  pill: 'bg-info-soft text-info-text',       dot: 'bg-info' },
+  AUSENTE:    { label: 'Ausente',    pill: 'bg-slate-100 text-slate-500',       dot: 'bg-slate-400' },
 };
 
 export function StatusBadge({ status, className }: { status: Status; className?: string }) {

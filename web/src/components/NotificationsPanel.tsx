@@ -21,11 +21,13 @@ const TONE: Record<Tone, string> = {
 
 // Cada tipo de notificación → su ícono y color
 const META: Record<NotificationType, { tone: Tone; icon: ReactNode }> = {
-  TURNO_SOLICITADO: { tone: 'warning', icon: <IconClock /> },
-  TURNO_CONFIRMADO: { tone: 'brand',   icon: <IconCalendar /> },
-  TURNO_CANCELADO:  { tone: 'danger',  icon: <IconX /> },
-  TURNO_COMPLETADO: { tone: 'success', icon: <IconCheckCircle /> },
-  RECETA_NUEVA:     { tone: 'success', icon: <IconPill /> },
+  TURNO_SOLICITADO:      { tone: 'warning', icon: <IconClock /> },
+  TURNO_CONFIRMADO:      { tone: 'brand',   icon: <IconCalendar /> },
+  TURNO_CANCELADO:       { tone: 'danger',  icon: <IconX /> },
+  TURNO_COMPLETADO:      { tone: 'success', icon: <IconCheckCircle /> },
+  RECETA_NUEVA:          { tone: 'success', icon: <IconPill /> },
+  SOBRETURNO_SOLICITADO: { tone: 'info',    icon: <IconClock /> },
+  SOBRETURNO_ASIGNADO:   { tone: 'success', icon: <IconCheckCircle /> },
 };
 
 function desde(iso: string): string {
@@ -83,11 +85,11 @@ export function NotificationsBell() {
         type="button"
         aria-label={unread > 0 ? `Notificaciones (${unread} sin leer)` : 'Notificaciones'}
         onClick={handleToggle}
-        className="relative p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors duration-150"
+        className="relative grid place-items-center w-10 h-10 rounded-full bg-surface ring-1 ring-inset ring-slate-200 text-slate-500 shadow-xs transition-colors duration-150 hover:text-brand-600 hover:ring-brand-300"
       >
         <IconBell className="w-5 h-5" />
         {unread > 0 && (
-          <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-brand-600 text-white text-[10px] font-bold grid place-items-center ring-2 ring-canvas tnum">
+          <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-danger text-white text-[10px] font-bold grid place-items-center ring-2 ring-canvas tnum">
             {unread > 9 ? '9+' : unread}
           </span>
         )}

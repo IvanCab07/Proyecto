@@ -3,10 +3,11 @@ import type { ReactNode } from 'react';
 import { View, Text, TextInput, Pressable } from 'react-native';
 import type { TextInputProps } from 'react-native';
 import { cn } from '../../lib/cn';
-import { colors } from '../../lib/theme';
+import type { Palette } from '../../lib/theme';
+import { useTheme } from '../../lib/useTheme';
 import { IconEye, IconEyeOff } from './Icon';
 
-function borderStyle(focused: boolean, error?: string) {
+function borderStyle(colors: Palette, focused: boolean, error?: string) {
   return {
     borderWidth: 1.5,
     borderColor: error ? colors.danger.DEFAULT : focused ? colors.brand[600] : colors.slate[200],
@@ -42,10 +43,11 @@ type InputProps = TextInputProps & {
 export const Input = forwardRef<TextInput, InputProps>(function Input(
   { label, hint, error, required, className, iconLeft, onFocus, onBlur, ...rest }, ref,
 ) {
+  const { colors } = useTheme();
   const [f, setF] = useState(false);
   return (
     <Field label={label} hint={hint} error={error} required={required} className={className}>
-      <View className="flex-row items-center bg-surface rounded-field px-3.5" style={borderStyle(f, error)}>
+      <View className="flex-row items-center bg-surface rounded-field px-3.5" style={borderStyle(colors, f, error)}>
         {iconLeft ? <View className="mr-2.5">{iconLeft}</View> : null}
         <TextInput
           ref={ref}
@@ -63,11 +65,12 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
 export const PasswordInput = forwardRef<TextInput, InputProps>(function PasswordInput(
   { label, hint, error, required, className, iconLeft, onFocus, onBlur, ...rest }, ref,
 ) {
+  const { colors } = useTheme();
   const [f, setF] = useState(false);
   const [show, setShow] = useState(false);
   return (
     <Field label={label} hint={hint} error={error} required={required} className={className}>
-      <View className="flex-row items-center bg-surface rounded-field px-3.5" style={borderStyle(f, error)}>
+      <View className="flex-row items-center bg-surface rounded-field px-3.5" style={borderStyle(colors, f, error)}>
         {iconLeft ? <View className="mr-2.5">{iconLeft}</View> : null}
         <TextInput
           ref={ref}
@@ -89,10 +92,11 @@ export const PasswordInput = forwardRef<TextInput, InputProps>(function Password
 export const Textarea = forwardRef<TextInput, InputProps>(function Textarea(
   { label, hint, error, required, className, onFocus, onBlur, style, ...rest }, ref,
 ) {
+  const { colors } = useTheme();
   const [f, setF] = useState(false);
   return (
     <Field label={label} hint={hint} error={error} required={required} className={className}>
-      <View className="bg-surface rounded-field px-3.5 py-3" style={borderStyle(f, error)}>
+      <View className="bg-surface rounded-field px-3.5 py-3" style={borderStyle(colors, f, error)}>
         <TextInput
           ref={ref}
           multiline

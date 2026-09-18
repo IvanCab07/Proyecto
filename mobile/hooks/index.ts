@@ -8,11 +8,13 @@ import {
   usersService,
   authService,
   notificationsService,
+  calificacionesService,
   CreateTurnoDTO,
   CreateMedicoDTO,
   CreateRecetaDTO,
   CreateUsuarioDTO,
   UpdateUsuarioDTO,
+  CreateCalificacionDTO,
   ActualizarPerfilDTO,
   CambiarPasswordDTO,
 } from '../services';
@@ -163,11 +165,37 @@ export const useMisEstudios = () =>
     queryFn: estudiosService.misEstudios,
   });
 
+/** Estudios de un paciente. Lo usa el médico desde el historial (el backend valida la relación). */
+export const useEstudiosPaciente = (pacienteId: string) =>
+  useQuery({
+    queryKey: ['estudios-paciente', pacienteId],
+    queryFn: () => estudiosService.porPaciente(pacienteId),
+    enabled: !!pacienteId,
+  });
+
 export const useSubirEstudio = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (formData: FormData) => estudiosService.subir(formData),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['mis-estudios'] }),
+    // Ahora también sube el médico a nombre de un paciente, así que hay que refrescar la
+    // vista del paciente, la del médico y el historial del admin.
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['mis-estudios'] });
+      qc.invalidateQueries({ queryKey: ['estudios-paciente'] });
+      qc.invalidateQueries({ queryKey: ['historial'] });
+    },
+  });
+};
+
+export const useEliminarEstudio = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => estudiosService.eliminar(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['mis-estudios'] });
+      qc.invalidateQueries({ queryKey: ['estudios-paciente'] });
+      qc.invalidateQueries({ queryKey: ['historial'] });
+    },
   });
 };
 
@@ -184,6 +212,18 @@ export const useCrearReceta = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['historial'] });
       qc.invalidateQueries({ queryKey: ['recetas-medico'] });
+    },
+  });
+};
+
+export const useEliminarReceta = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => recetasService.eliminar(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['recetas-medico'] });
+      qc.invalidateQueries({ queryKey: ['mis-recetas'] });
+      qc.invalidateQueries({ queryKey: ['historial'] });
     },
   });
 };
@@ -213,6 +253,26 @@ export const useCambiarPassword = () =>
   useMutation({
     mutationFn: (data: CambiarPasswordDTO) => authService.cambiarPassword(data),
   });
+
+// ── Foto de perfil ──
+// Los dos endpoints devuelven el usuario completo, pero se recarga con loadUser() igual que
+// useActualizarPerfil: el store es la única fuente de verdad del usuario logueado.
+
+export const useSubirFotoPerfil = () => {
+  const loadUser = useAuthStore(s => s.loadUser);
+  return useMutation({
+    mutationFn: (formData: FormData) => authService.subirFoto(formData),
+    onSuccess: () => loadUser(),
+  });
+};
+
+export const useEliminarFotoPerfil = () => {
+  const loadUser = useAuthStore(s => s.loadUser);
+  return useMutation({
+    mutationFn: () => authService.eliminarFoto(),
+    onSuccess: () => loadUser(),
+  });
+};
 
 // ── Seguridad de cuenta (verificación de email + 2FA) ──
 export const useReenviarVerificacion = () =>
@@ -283,6 +343,35 @@ export const useMiAgenda = () =>
 
 export const useRecetasMedico = () =>
   useQuery({ queryKey: ['recetas-medico'], queryFn: recetasService.delMedico });
+
+export const useMiFichaMedico = () =>
+  useQuery({ queryKey: ['mi-ficha-medico'], queryFn: medicosService.miFicha });
+
+export const useActualizarMiDisponibilidad = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (disponible: boolean) => medicosService.actualizarMiDisponibilidad(disponible),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['mi-ficha-medico'] }),
+  });
+};
+
+// ── Calificaciones ──
+export const useCrearCalificacion = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateCalificacionDTO) => calificacionesService.crear(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['mis-turnos'] });
+      qc.invalidateQueries({ queryKey: ['calificaciones'] });
+    },
+  });
+};
+
+export const useCalificacionesAdmin = () =>
+  useQuery({ queryKey: ['calificaciones'], queryFn: calificacionesService.listadoAdmin });
+
+export const useMisCalificacionesMedico = () =>
+  useQuery({ queryKey: ['calificaciones-medico'], queryFn: calificacionesService.miMedico });
 
 // ── Notificaciones ──
 export const useNotifications = () =>

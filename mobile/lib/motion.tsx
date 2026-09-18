@@ -59,11 +59,22 @@ export function useReducedMotion(): boolean {
 }
 
 // ---- PressableScale: whileTap scale + háptico (espeja el Button de la web) ----
+//
+// OJO con el layout: `className` y `style` van al Animated.View interno, no al Pressable —
+// tienen que ir ahí para que la animación de escala envuelva al contenido. La consecuencia es
+// que **un `flex-1` en el className no estira el botón**: se lo aplica al hijo, mientras que el
+// Pressable (que es el que compite por espacio en la fila) se sigue ajustando al contenido. El
+// síntoma es una fila de botones de anchos distintos según el largo de cada texto.
+//
+// Para eso está `fill`: pone el flex donde corresponde. La alternativa de siempre —envolver en
+// un `<View className="flex-1">`— también sirve y es la que usa RoleTabBar.
 type PressableScaleProps = PressableProps & {
   scaleTo?: number;
   haptic?: HapticKind;
   className?: string;
   style?: StyleProp<ViewStyle>;
+  /** Estira el botón para ocupar el espacio disponible de la fila o columna que lo contiene. */
+  fill?: boolean;
   children?: ReactNode;
 };
 
@@ -72,6 +83,7 @@ export function PressableScale({
   haptic: kind = 'light',
   className,
   style,
+  fill = false,
   children,
   onPressIn,
   onPressOut,
@@ -85,12 +97,13 @@ export function PressableScale({
   return (
     <Pressable
       disabled={disabled}
+      style={fill ? { flex: 1 } : undefined}
       onPressIn={(e) => { scale.value = withTiming(scaleTo, { duration: 110, easing: EASE.out }); onPressIn?.(e); }}
       onPressOut={(e) => { scale.value = withSpring(1, SPRING.snappy); onPressOut?.(e); }}
       onPress={(e) => { if (kind && !disabled) haptic[kind](); onPress?.(e); }}
       {...rest}
     >
-      <Animated.View style={[aStyle, style]} className={className}>
+      <Animated.View style={[aStyle, fill ? { flex: 1 } : null, style]} className={className}>
         {children}
       </Animated.View>
     </Pressable>

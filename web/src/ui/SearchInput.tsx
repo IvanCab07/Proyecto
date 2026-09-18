@@ -11,9 +11,9 @@ export function SearchInput({ className, ...rest }: SearchInputProps) {
       <input
         type="search"
         className={cn(
-          'w-full h-10 pl-9 pr-3.5 bg-surface rounded-field text-sm text-slate-900 placeholder:text-slate-400',
+          'w-full h-10 pl-9 pr-3.5 bg-surface rounded-pill text-sm text-slate-900 placeholder:text-slate-400',
           'shadow-xs ring-1 ring-inset ring-slate-200',
-          'outline-none focus:outline-none focus:ring-2 focus:ring-brand-600',
+          'outline-none focus:outline-none focus:ring-2 focus:ring-brand-500 focus:shadow-focus',
           'transition-shadow duration-150',
           '[&::-webkit-search-cancel-button]:hidden',
         )}

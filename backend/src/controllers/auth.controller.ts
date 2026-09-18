@@ -6,26 +6,32 @@ import { authenticator } from 'otplib';
 import QRCode from 'qrcode';
 import { prisma } from '../lib/prisma';
 import { HttpError, formatZodError } from '../lib/httpError';
+import {
+  nombreSchema, dniSchema, telefonoOpcionalSchema, emailSchema, passwordSchema,
+} from '../lib/validaciones';
 import { createToken, consumeToken } from '../lib/tokens';
 import { sendMail, verifyEmailTemplate, resetPasswordTemplate } from '../lib/mailer';
+import { borrarArchivo } from '../lib/archivos';
 import { WEB_URL } from '../config/env';
 
 // Datos públicos del usuario que mandamos al front (nunca password ni el secreto 2FA)
 const USER_PUBLIC = {
   id: true, email: true, nombre: true, apellido: true,
-  dni: true, telefono: true, role: true,
-  emailVerified: true, twoFactorEnabled: true,
+  dni: true, telefono: true, fotoUrl: true, role: true,
+  emailVerified: true, twoFactorEnabled: true, puedeCalificar: true,
 } as const;
 
 const registerSchema = z.object({
-  email:    z.string().email(),
-  password: z.string().min(6),
-  nombre:   z.string().min(2),
-  apellido: z.string().min(2),
-  dni:      z.string().min(7).max(11),
-  telefono: z.string().optional(),
+  email:    emailSchema,
+  password: passwordSchema,
+  nombre:   nombreSchema,
+  apellido: nombreSchema,
+  dni:      dniSchema,
+  telefono: telefonoOpcionalSchema,
 });
 
+// El login no valida el formato de la contraseña: las cuentas viejas pueden tener una que
+// hoy no pasaría el schema y no hay que dejarlas afuera.
 const loginSchema = z.object({
   email:    z.string().email(),
   password: z.string().min(1),
@@ -121,14 +127,14 @@ export const me = async (req: Request, res: Response) => {
 };
 
 const perfilSchema = z.object({
-  nombre:   z.string().min(2).optional(),
-  apellido: z.string().min(2).optional(),
-  telefono: z.string().optional(),
+  nombre:   nombreSchema.optional(),
+  apellido: nombreSchema.optional(),
+  telefono: telefonoOpcionalSchema,
 });
 
 const cambiarPasswordSchema = z.object({
   passwordActual: z.string().min(1),
-  passwordNueva:  z.string().min(6),
+  passwordNueva:  passwordSchema,
 });
 
 export const actualizarPerfil = async (req: Request, res: Response) => {
@@ -142,6 +148,59 @@ export const actualizarPerfil = async (req: Request, res: Response) => {
     data: result.data,
     select: USER_PUBLIC,
   });
+
+  return res.json(user);
+};
+
+/**
+ * Reemplaza la foto de perfil. El archivo lo procesa uploadImagen.middleware antes de llegar acá.
+ *
+ * Responde 200 (y no 201) con el usuario completo: no crea un recurso nuevo direccionable, pisa
+ * un campo. Devolver el `User` entero deja que el front solo actualice su store, igual que
+ * `PATCH /perfil`.
+ */
+export const subirFotoPerfil = async (req: Request, res: Response) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Foto requerida (JPG, PNG o WEBP, máx 2MB)' });
+  }
+
+  const anterior = await prisma.user.findUnique({
+    where: { id: req.user!.userId },
+    select: { fotoUrl: true },
+  });
+
+  const user = await prisma.user.update({
+    where: { id: req.user!.userId },
+    data: { fotoUrl: `/uploads/${req.file.filename}` },
+    select: USER_PUBLIC,
+  });
+
+  // Recién ahora se borra la anterior: si se hiciera antes y el update fallara, el usuario
+  // quedaría apuntando a un archivo que ya no existe.
+  if (anterior?.fotoUrl) await borrarArchivo(anterior.fotoUrl);
+
+  return res.json(user);
+};
+
+/**
+ * Saca la foto de perfil y vuelve a las iniciales.
+ *
+ * Es idempotente a propósito: si no había foto igual responde 200. Un 404 obligaría al front a
+ * condicionar el botón y no aportaría nada.
+ */
+export const eliminarFotoPerfil = async (req: Request, res: Response) => {
+  const anterior = await prisma.user.findUnique({
+    where: { id: req.user!.userId },
+    select: { fotoUrl: true },
+  });
+
+  const user = await prisma.user.update({
+    where: { id: req.user!.userId },
+    data: { fotoUrl: null },
+    select: USER_PUBLIC,
+  });
+
+  if (anterior?.fotoUrl) await borrarArchivo(anterior.fotoUrl);
 
   return res.json(user);
 };
@@ -227,7 +286,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
 const resetSchema = z.object({
   token:    z.string().min(10),
-  password: z.string().min(6),
+  password: passwordSchema,
 });
 
 export const resetPassword = async (req: Request, res: Response) => {

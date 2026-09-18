@@ -8,9 +8,12 @@ export interface User {
   apellido: string;
   dni: string;
   telefono?: string;
+  /** Ruta relativa de la foto de perfil ("/uploads/avatar-x.jpg"). null = mostrar iniciales. */
+  fotoUrl?: string | null;
   role: 'PATIENT' | 'ADMIN' | 'MEDICO';
   emailVerified: boolean;
   twoFactorEnabled: boolean;
+  puedeCalificar?: boolean;
 }
 
 export interface LoginDTO {
@@ -52,12 +55,15 @@ export interface TwoFactorChallenge { twoFactorRequired: true; challenge: string
 export type LoginResult = AuthResponse | TwoFactorChallenge;
 export interface TwoFactorSetup { secret: string; otpauthUrl: string; qr: string; }
 
+export type TurnoStatus = 'PENDIENTE' | 'CONFIRMADO' | 'CANCELADO' | 'COMPLETADO' | 'EN_ESPERA' | 'AUSENTE';
+
 export interface Turno {
   id: string;
   fecha: string;
   hora: string;
   motivo?: string;
-  status: 'PENDIENTE' | 'CONFIRMADO' | 'CANCELADO' | 'COMPLETADO';
+  status: TurnoStatus;
+  esSobreturno?: boolean;
   medico: {
     id: string;
     nombre: string;
@@ -65,6 +71,7 @@ export interface Turno {
     especialidad: { id: string; nombre: string };
   };
   paciente?: Pick<User, 'id' | 'nombre' | 'apellido' | 'dni'>;
+  calificacion?: Calificacion | null;
   notas?: string;
   razonCancelacion?: string;
   diagnostico?: string;
@@ -75,6 +82,59 @@ export interface CreateTurnoDTO {
   fecha: string;
   hora: string;
   motivo?: string;
+  esSobreturno?: boolean;
+}
+
+export interface Calificacion {
+  id: string;
+  turnoId: string;
+  pacienteId: string;
+  medicoId: string;
+  estrellas: number;
+  comentario?: string | null;
+  createdAt: string;
+}
+
+export interface CreateCalificacionDTO {
+  turnoId: string;
+  estrellas: number;
+  comentario?: string;
+}
+
+export interface CalificacionDetalle extends Calificacion {
+  paciente?: { id: string; nombre: string; apellido: string; dni: string };
+  medico?: { id: string; nombre: string; apellido: string; especialidad: { nombre: string } };
+  turno?: { id: string; fecha: string; hora: string };
+}
+
+export interface PromedioMedico {
+  medicoId: string;
+  nombre: string;
+  especialidad: string;
+  promedio: number;
+  cantidad: number;
+}
+
+export interface CalificacionesAdmin {
+  calificaciones: CalificacionDetalle[];
+  promediosPorMedico: PromedioMedico[];
+}
+
+/**
+ * Lo que devuelve GET /calificaciones/medico. El backend ya mandaba `distribucion`,
+ * `atendidos` y `tasaRespuesta` desde siempre; el tipo de acá no los declaraba y la app
+ * los estaba descartando.
+ */
+export interface CalificacionesMedico {
+  calificaciones: CalificacionDetalle[];
+  promedio: number;
+  cantidad: number;
+  /** Cuántas reseñas hay de cada puntaje. Los 5 tramos vienen siempre, con 0 si no hubo. */
+  distribucion: Record<1 | 2 | 3 | 4 | 5, number>;
+  /** Turnos COMPLETADOS: la base sobre la que se calcula tasaRespuesta. */
+  atendidos: number;
+  /** Porcentaje entero (0-100) de turnos atendidos que dejaron reseña. */
+  tasaRespuesta: number;
 }
 
 export interface Medico {
@@ -95,6 +155,9 @@ export interface CreateMedicoDTO {
 
 export interface Estudio {
   id: string;
+  pacienteId: string;
+  /** Quién lo subió. El médico solo puede borrar los que subió él (lo valida el backend). */
+  subidoPorId?: string | null;
   titulo: string;
   descripcion?: string;
   archivoUrl: string;
@@ -108,7 +171,9 @@ export interface Receta {
   dosis: string;
   indicacion: string;
   fechaEmision: string;
-  validoHasta?: string;
+  // Toda receta vence: la columna es NOT NULL y el backend completa 30 días si el emisor no
+  // manda la fecha. Era opcional acá por arrastre de antes de esa migración.
+  validoHasta: string;
   medico: {
     nombre: string;
     apellido: string;
@@ -141,9 +206,11 @@ export interface Cuenta {
   apellido: string;
   dni: string;
   telefono?: string;
+  fotoUrl?: string | null;
   role: 'PATIENT' | 'ADMIN' | 'MEDICO';
   activo: boolean;
   createdAt: string;
+  puedeCalificar: boolean;
   medico?: { id: string; matricula: string; especialidad: { id: string; nombre: string } } | null;
 }
 
@@ -165,7 +232,10 @@ export interface UpdateUsuarioDTO {
   telefono?: string;
   role?: 'PATIENT' | 'ADMIN' | 'MEDICO';
   activo?: boolean;
+  puedeCalificar?: boolean;
 }
+
+export interface TrendPoint { fecha?: string; mes?: string; label: string; total: number; }
 
 export interface AdminStats {
   turnos: {
@@ -174,9 +244,11 @@ export interface AdminStats {
     confirmados: number;
     completados: number;
     cancelados: number;
+    ausentes: number;
     hoy: number;
     mes: number;
   };
+  tendencia: { dias: TrendPoint[]; meses: TrendPoint[] };
   usuarios: { pacientes: number };
   medicos: { disponibles: number };
   topMedicos: { nombre: string; especialidad: string; total: number }[];
@@ -210,6 +282,17 @@ export const authService = {
     const res = await api.patch<{ message: string }>('/auth/cambiar-password', data);
     return res.data;
   },
+
+  // ── Foto de perfil ──
+  // Los dos devuelven el usuario completo, así que alcanza con pisar el del store.
+  // El FormData lleva la imagen bajo el campo "foto" (lo exige uploadImagen.middleware).
+  subirFoto: (formData: FormData) =>
+    api.post<User>('/auth/perfil/foto', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(r => r.data),
+
+  eliminarFoto: () =>
+    api.delete<User>('/auth/perfil/foto').then(r => r.data),
 
   logout: async () => {
     await SecureStore.deleteItemAsync('auth_token');
@@ -272,7 +355,7 @@ export const medicosService = {
     api.get<Medico[]>('/medicos/all').then(r => r.data),
 
   disponibilidad: (medicoId: string, fecha: string) =>
-    api.get<{ horasOcupadas: string[] }>(`/medicos/${medicoId}/disponibilidad`, { params: { fecha } }).then(r => r.data),
+    api.get<{ horasOcupadas: string[]; sobreturnos?: Record<string, number> }>(`/medicos/${medicoId}/disponibilidad`, { params: { fecha } }).then(r => r.data),
 
   crear: (data: CreateMedicoDTO) =>
     api.post<Medico>('/medicos', data).then(r => r.data),
@@ -282,6 +365,13 @@ export const medicosService = {
 
   eliminar: (id: string) =>
     api.delete(`/medicos/${id}`),
+
+  // Médico: su propia ficha y disponibilidad
+  miFicha: () =>
+    api.get<Medico>('/medicos/mi-ficha').then(r => r.data),
+
+  actualizarMiDisponibilidad: (disponible: boolean) =>
+    api.patch<Medico>('/medicos/mi-disponibilidad', { disponible }).then(r => r.data),
 };
 
 export const estudiosService = {
@@ -295,6 +385,9 @@ export const estudiosService = {
 
   porPaciente: (pacienteId: string) =>
     api.get<Estudio[]>(`/estudios/paciente/${pacienteId}`).then(r => r.data),
+
+  eliminar: (id: string) =>
+    api.delete<{ message: string }>(`/estudios/${id}`).then(r => r.data),
 };
 
 export const recetasService = {
@@ -307,6 +400,10 @@ export const recetasService = {
   // Recetas emitidas por el médico logueado
   delMedico: () =>
     api.get<Receta[]>('/recetas/medico').then(r => r.data),
+
+  // El backend solo deja borrar las que emitió el propio médico (el admin, cualquiera)
+  eliminar: (id: string) =>
+    api.delete<{ message: string }>(`/recetas/${id}`).then(r => r.data),
 };
 
 export const usersService = {
@@ -333,6 +430,15 @@ export const usersService = {
     api.delete(`/users/${id}`),
 };
 
+export const calificacionesService = {
+  crear: (data: CreateCalificacionDTO) =>
+    api.post<Calificacion>('/calificaciones', data).then(r => r.data),
+  listadoAdmin: () =>
+    api.get<CalificacionesAdmin>('/calificaciones').then(r => r.data),
+  miMedico: () =>
+    api.get<CalificacionesMedico>('/calificaciones/medico').then(r => r.data),
+};
+
 export const especialidadesService = {
   todas: () =>
     api.get<Especialidad[]>('/especialidades').then(r => r.data),
@@ -348,7 +454,8 @@ export const especialidadesService = {
 };
 
 export type NotificationType =
-  | 'TURNO_SOLICITADO' | 'TURNO_CONFIRMADO' | 'TURNO_CANCELADO' | 'TURNO_COMPLETADO' | 'RECETA_NUEVA';
+  | 'TURNO_SOLICITADO' | 'TURNO_CONFIRMADO' | 'TURNO_CANCELADO' | 'TURNO_COMPLETADO' | 'RECETA_NUEVA'
+  | 'SOBRETURNO_SOLICITADO' | 'SOBRETURNO_ASIGNADO';
 
 export interface Notification {
   id: string;
