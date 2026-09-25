@@ -45,6 +45,33 @@ async function main() {
 
   console.log('Especialidades listas');
 
+  const osde = await prisma.obraSocial.upsert({
+  where: { nombre: 'OSDE' },
+  update: {},
+  create: { nombre: 'OSDE' },
+});
+const swissMedical = await prisma.obraSocial.upsert({
+  where: { nombre: 'Swiss Medical' },
+  update: {},
+  create: { nombre: 'Swiss Medical' },
+});
+await prisma.obraSocial.upsert({
+  where: { nombre: 'Galeno' },
+  update: {},
+  create: { nombre: 'Galeno' },
+});
+
+await prisma.coberturaEspecialidad.upsert({
+  where: { obraSocialId_especialidadId: { obraSocialId: osde.id, especialidadId: clinica.id } },
+  update: {},
+  create: { obraSocialId: osde.id, especialidadId: clinica.id, porcentajeCobertura: 80 },
+});
+await prisma.coberturaEspecialidad.upsert({
+  where: { obraSocialId_especialidadId: { obraSocialId: swissMedical.id, especialidadId: pediatria.id } },
+  update: {},
+  create: { obraSocialId: swissMedical.id, especialidadId: pediatria.id, porcentajeCobertura: 70 },
+});
+
   const drGarcia = await prisma.medico.upsert({
     where: { matricula: 'MP-12345' },
     update: {},
