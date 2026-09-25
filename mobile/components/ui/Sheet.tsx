@@ -7,7 +7,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DUR, EASE, SPRING } from '../../lib/motion';
-import { colors } from '../../lib/theme';
+import { useTheme } from '../../lib/useTheme';
 import { IconX } from './Icon';
 
 // Bottom-sheet arrastrable (drag-to-dismiss) con backdrop que se atenúa con el arrastre.
@@ -19,6 +19,7 @@ export function Sheet({
   title?: string;
   children: ReactNode;
 }) {
+  const { colors } = useTheme();
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const ty = useSharedValue(height);

@@ -1,8 +1,10 @@
 import { View, Text } from 'react-native';
-import { STATUS, type TurnoStatus } from '../../lib/theme';
+import type { TurnoStatus } from '../../lib/theme';
+import { useTheme } from '../../lib/useTheme';
 
-// Pill con punto, color por estado (fuente única en lib/theme STATUS).
+// Pill con punto, color por estado (fuente única en lib/theme statusFor).
 export function StatusBadge({ status, onDark = false }: { status: TurnoStatus; onDark?: boolean }) {
+  const { STATUS } = useTheme();
   const s = STATUS[status] ?? STATUS.PENDIENTE;
   return (
     <View

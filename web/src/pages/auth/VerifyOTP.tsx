@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { apiError } from '../../lib/apiError';
 import { homePath } from '../../lib/nav';
-import { AuthLayout, AUTH_FEATURES } from './AuthLayout';
+import { AuthLayout } from './AuthLayout';
 import { Input, Button } from '../../ui';
 import { IconAlert, IconArrowRight, IconShield } from '../../ui/icons';
 
@@ -38,7 +38,7 @@ export default function VerifyOTP() {
     <AuthLayout
       headline={<>Un paso <em className="not-italic text-brand-300">más</em>.</>}
       tagline="Tu cuenta está protegida con verificación en dos pasos. Ingresá el código de tu app autenticadora."
-      features={AUTH_FEATURES}
+      image="login"
     >
       <span className="mb-5 w-12 h-12 rounded-2xl bg-brand-100 text-brand-700 grid place-items-center [&>svg]:w-6 [&>svg]:h-6">
         <IconShield />

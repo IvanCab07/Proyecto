@@ -42,6 +42,8 @@ enum TurnoStatus {
   CONFIRMADO  // El admin lo confirmó
   CANCELADO   // El paciente o admin lo canceló
   COMPLETADO  // La consulta ya se realizó
+  EN_ESPERA   // Sobreturno: el horario está ocupado y este turno espera en cola a que se libere
+  AUSENTE     // El paciente no se presentó (no-show). Libera el horario para los sobreturnos
 }
 
 // ── TABLA: users (Usuarios) ─────────────────────────────────
@@ -54,13 +56,22 @@ model User {
   apellido     String                           // Apellido del usuario
   dni          String   @unique                 // DNI (no puede repetirse)
   telefono     String?                          // Teléfono (opcional, el "?" significa eso)
+  fotoUrl      String?  @db.VarChar(255)         // Ruta de la foto de perfil ("/uploads/avatar-x.jpg"), null = iniciales
   role         Role     @default(PATIENT)       // Rol (por defecto es paciente)
   activo       Boolean  @default(true)          // Si la cuenta está habilitada para ingresar
+
+  // ── Baja de la cuenta ──
+  // Se completan cuando el admin la da de baja y se limpian al reactivarla.
+  motivoBaja    String?                         // Por qué se dio de baja (lo escribe el admin)
+  desactivadoAt DateTime?                       // Cuándo se dio de baja
 
   // ── Seguridad de cuenta ──
   emailVerified    Boolean @default(false)      // Si el email fue confirmado por el usuario
   twoFactorEnabled Boolean @default(false)      // Si activó la verificación en dos pasos (2FA)
   twoFactorSecret  String?                      // Secreto TOTP (base32) para generar/validar códigos
+
+  // ── Calificaciones ──
+  puedeCalificar   Boolean @default(true)       // Si el admin le permite calificar sus turnos completados
 
   createdAt    DateTime @default(now())         // Fecha de creación automática
   updatedAt    DateTime @updatedAt              // Se actualiza cada vez que se modifica
@@ -69,6 +80,12 @@ model User {
   turnos       Turno[]
   estudios     Estudio[]
   recetas      Receta[]
+
+  // Estudios que este usuario subió (los propios, o los que un médico cargó para un paciente)
+  estudiosSubidos Estudio[] @relation("EstudiosSubidos")
+
+  // Calificaciones que dejó este paciente
+  calificaciones Calificacion[]
 
   // Tokens de verificación de email / reseteo de contraseña
   verificationTokens VerificationToken[]
@@ -85,11 +102,13 @@ model User {
 // ── TABLA: notifications ────────────────────────────────────
 // Avisos in-app que el sistema genera en eventos (turnos, recetas).
 enum NotificationType {
-  TURNO_SOLICITADO    // Un paciente pidió un turno (aviso para el admin)
-  TURNO_CONFIRMADO    // El admin/médico confirmó el turno (aviso para el paciente)
-  TURNO_CANCELADO     // Se canceló un turno (aviso para la otra parte)
-  TURNO_COMPLETADO    // La consulta se realizó (aviso para el paciente)
-  RECETA_NUEVA        // Se emitió una receta (aviso para el paciente)
+  TURNO_SOLICITADO       // Un paciente pidió un turno (aviso para el admin)
+  TURNO_CONFIRMADO       // El admin/médico confirmó el turno (aviso para el paciente)
+  TURNO_CANCELADO        // Se canceló un turno (aviso para la otra parte)
+  TURNO_COMPLETADO       // La consulta se realizó (aviso para el paciente)
+  RECETA_NUEVA           // Se emitió una receta (aviso para el paciente)
+  SOBRETURNO_SOLICITADO  // Un paciente se anotó como sobreturno (aviso para el admin)
+  SOBRETURNO_ASIGNADO    // Se le cedió un sobreturno: ahora el turno es suyo (aviso para el paciente)
 }
 
 model Notification {
@@ -158,6 +177,7 @@ model Medico {
   // Relaciones
   turnos         Turno[]
   recetas        Receta[]
+  calificaciones Calificacion[]
 
   @@map("medicos")
 }
@@ -172,6 +192,7 @@ model Turno {
   hora        String                                // Hora del turno (formato "HH:MM")
   motivo           String?                               // Motivo de la consulta (opcional)
   status           TurnoStatus @default(PENDIENTE)       // Estado actual del turno
+  esSobreturno     Boolean     @default(false)           // Si se pidió como sobreturno (queda en true aun tras ser cedido)
   notas            String?                               // Notas del admin (opcional)
   razonCancelacion String?                               // Razón de cancelación (opcional)
   diagnostico      String?                               // Diagnóstico/observaciones al completar
@@ -182,14 +203,36 @@ model Turno {
   paciente    User        @relation(fields: [pacienteId], references: [id])
   medico      Medico      @relation(fields: [medicoId], references: [id])
 
+  // Calificación que dejó el paciente sobre este turno (una sola, opcional)
+  calificacion Calificacion?
+
   @@map("turnos")
+}
+
+// ── TABLA: calificaciones ───────────────────────────────────
+// Reseña que deja el paciente sobre un turno completado: estrellas (1-5) + comentario.
+model Calificacion {
+  id         String   @id @default(uuid())
+  turnoId    String   @unique                            // Un turno se califica una sola vez
+  turno      Turno    @relation(fields: [turnoId], references: [id], onDelete: Cascade)
+  pacienteId String                                       // Quién calificó
+  paciente   User     @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  medicoId   String                                       // Médico calificado (desnormalizado para promedios)
+  medico     Medico   @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+  estrellas  Int                                          // Puntaje de 1 a 5
+  comentario String?  @db.Text                            // Comentario opcional
+  createdAt  DateTime @default(now())
+
+  @@index([medicoId])
+  @@map("calificaciones")
 }
 
 // ── TABLA: estudios ─────────────────────────────────────────
 // Archivos de estudios médicos que sube el paciente (PDFs, imágenes).
 model Estudio {
   id          String   @id @default(uuid())
-  pacienteId  String
+  pacienteId  String                                // De quién es el estudio
+  subidoPorId String?                               // Quién lo subió (null = histórico previo a este campo)
   titulo      String                                // Nombre del estudio
   descripcion String?                               // Descripción opcional
   archivoUrl  String                                // Ruta al archivo guardado
@@ -198,6 +241,8 @@ model Estudio {
   createdAt   DateTime @default(now())
 
   paciente    User     @relation(fields: [pacienteId], references: [id])
+  // Si se elimina la cuenta que lo subió, el estudio queda igual pero sin autor
+  subidoPor   User?    @relation("EstudiosSubidos", fields: [subidoPorId], references: [id], onDelete: SetNull)
 
   @@map("estudios")
 }
@@ -212,7 +257,10 @@ model Receta {
   dosis        String                               // Dosis (ej: "500mg cada 8hs")
   indicacion   String                               // Indicaciones especiales
   fechaEmision DateTime @default(now())             // Fecha en que se emitió
-  validoHasta  DateTime?                            // Fecha de vencimiento (opcional)
+  // Vencimiento obligatorio: una receta sin fecha no vencía nunca y el paciente no tenía
+  // forma de saber si todavía servía. Si el emisor no la manda, el controller la completa
+  // con fechaEmision + VALIDEZ_POR_DEFECTO_DIAS.
+  validoHasta  DateTime
   createdAt    DateTime @default(now())
 
   paciente     User     @relation(fields: [pacienteId], references: [id])

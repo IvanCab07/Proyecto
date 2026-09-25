@@ -1,27 +1,20 @@
-import { View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useUnreadCount } from '../hooks';
-import { IconBell } from './ui';
+import { IconBell, TopbarButton } from './ui';
+import { useTheme } from '../lib/useTheme';
 
-// Campana con badge para los headers de las pantallas principales.
-// Va sobre el gradiente oscuro del ScreenHeader, por eso el ícono es blanco.
-export function NotificationBell({ color = '#fff' }: { color?: string }) {
+// Campana con badge para las barras de las pantallas principales.
+//
+// Usa TopbarButton, así comparte caja con el selector de tema y con cualquier acción que se
+// sume después. `onDark` es para las pocas cabeceras que siguen sobre verde.
+export function NotificationBell({ onDark = false }: { onDark?: boolean }) {
   const router = useRouter();
+  const { colors } = useTheme();
   const { data: unread = 0 } = useUnreadCount();
 
   return (
-    <Pressable
-      onPress={() => router.push('/notifications')}
-      hitSlop={10}
-      accessibilityLabel={unread > 0 ? `Notificaciones, ${unread} sin leer` : 'Notificaciones'}
-      className="w-10 h-10 rounded-full items-center justify-center bg-white/10"
-    >
-      <IconBell size={20} color={color} />
-      {unread > 0 && (
-        <View className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-brand-500 items-center justify-center">
-          <Text className="text-white text-[10px] font-bold">{unread > 9 ? '9+' : unread}</Text>
-        </View>
-      )}
-    </Pressable>
+    <TopbarButton onPress={() => router.push('/notifications')} badge={unread} onDark={onDark}>
+      <IconBell size={19} color={onDark ? colors.railFg : colors.slate[600]} />
+    </TopbarButton>
   );
 }

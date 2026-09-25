@@ -4,28 +4,36 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { authService } from '../../services';
 import { apiError } from '../../lib/apiError';
-import { AuthLayout, AUTH_FEATURES } from './AuthLayout';
-import { PasswordInput, Button } from '../../ui';
+import { useFormulario } from '../../lib/useFormulario';
+import { LIMITES, validarPassword, validarConfirmacion } from '../../lib/validaciones';
+import { AuthLayout } from './AuthLayout';
+import { PasswordInput, PasswordStrength, Button } from '../../ui';
 import { IconAlert, IconArrowRight, IconCheckCircle } from '../../ui/icons';
 
 export default function ResetPassword() {
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';
 
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const { valores, campo, validarTodo } = useFormulario(
+    { password: '', confirm: '' },
+    {
+      password: validarPassword,
+      confirm:  (v, todos) => validarConfirmacion(todos.password, v),
+    },
+  );
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
-    if (password.length < 6) return setError('La contraseña debe tener al menos 6 caracteres');
-    if (password !== confirm) return setError('Las contraseñas no coinciden');
+    if (!validarTodo()) return;
+
     setLoading(true);
     try {
-      await authService.resetPassword(token, password);
+      await authService.resetPassword(token, valores.password);
       setDone(true);
     } catch (err) {
       setError(apiError(err, 'No se pudo restablecer la contraseña'));
@@ -38,7 +46,7 @@ export default function ResetPassword() {
     <AuthLayout
       headline={<>Una contraseña <em className="not-italic text-brand-300">nueva</em>.</>}
       tagline="Elegí una contraseña segura para volver a entrar a tu cuenta."
-      features={AUTH_FEATURES}
+      image="recovery"
     >
       {done ? (
         <div className="text-center">
@@ -67,24 +75,27 @@ export default function ResetPassword() {
           <h2 className="text-2xl font-bold tracking-tighter2 text-slate-900">Restablecer contraseña</h2>
           <p className="text-sm text-slate-500 mt-1.5 mb-8">Elegí tu nueva contraseña.</p>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <PasswordInput
-              label="Nueva contraseña"
-              required
-              autoFocus
-              autoComplete="new-password"
-              hint="Mínimo 6 caracteres"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••"
-            />
+          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+            <div>
+              <PasswordInput
+                label="Nueva contraseña"
+                required
+                autoFocus
+                maxLength={LIMITES.password}
+                autoComplete="new-password"
+                hint={`Mínimo ${LIMITES.passwordMin} caracteres, con una letra y un número`}
+                placeholder="••••••••"
+                {...campo('password')}
+              />
+              <PasswordStrength value={valores.password} />
+            </div>
             <PasswordInput
               label="Confirmar contraseña"
               required
+              maxLength={LIMITES.password}
               autoComplete="new-password"
-              value={confirm}
-              onChange={e => setConfirm(e.target.value)}
               placeholder="••••••••"
+              {...campo('confirm')}
             />
 
             <AnimatePresence initial={false}>

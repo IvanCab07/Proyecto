@@ -1,15 +1,17 @@
 import { create } from 'zustand';
-import { discoverServer, probe, normalizeServerInput, ProbeResult } from '../services/serverDiscovery';
+import { discoverServer, ProbeResult } from '../services/serverDiscovery';
 import { setApiUrl, getApiUrl } from '../services/api';
 
 type ServerStatus = 'buscando' | 'conectado' | 'sin-servidor';
 
+// El backend se resuelve solo por autodescubrimiento. Ya no existe la pantalla donde el usuario
+// tipeaba una IP a mano, así que tampoco está `applyManualUrl`: la única acción disponible es
+// reintentar la búsqueda, y la ofrece el gate de arranque (app/index.tsx) cuando falla.
 interface ServerState {
   status: ServerStatus;
   url: string | null;
   tried: ProbeResult[];
   runDiscovery: () => Promise<boolean>;
-  applyManualUrl: (input: string) => Promise<ProbeResult>;
 }
 
 export const useServerStore = create<ServerState>((set) => ({
@@ -28,17 +30,5 @@ export const useServerStore = create<ServerState>((set) => ({
     }
     set({ status: 'sin-servidor', url: null, tried });
     return false;
-  },
-
-  // Prueba una IP/URL escrita por el usuario y, si responde, la guarda y la usa
-  applyManualUrl: async (input: string) => {
-    const url = normalizeServerInput(input);
-    if (!url) return { url: input, ok: false, error: 'Ingresá una IP o URL' };
-    const result = await probe(url, 4000);
-    if (result.ok) {
-      await setApiUrl(url);
-      set({ status: 'conectado', url });
-    }
-    return result;
   },
 }));

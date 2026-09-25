@@ -1,0 +1,23 @@
+{
+  "name": "Vitalis — Turnos y gestión de salud",
+  "short_name": "Vitalis",
+  "description": "Sacá turnos, consultá tus recetas y guardá tus estudios médicos en un solo lugar.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F8FAF9",
+  "theme_color": "#2C5F4E",
+  "lang": "es-AR",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

@@ -6,17 +6,21 @@ import Animated from 'react-native-reanimated';
 import { useAuthStore } from '../../../hooks/useAuthStore';
 import { useMisTurnos, useMisRecetas, useMisEstudios } from '../../../hooks';
 import {
-  Card, StatCard, StatusBadge, Spinner, EmptyState,
+  Card, StatCard, StatusBadge, Spinner,
   IconPlus, IconCalendar, IconClock, IconPill, IconFolder, IconCheckCircle,
-  IconArrowRight, IconChevronRight, IconStethoscope, IconMapPin, IconUser,
+  IconArrowRight, IconChevronRight, IconStethoscope,
 } from '../../../components/ui';
 import { NotificationBell } from '../../../components/NotificationBell';
+import { ThemeToggle } from '../../../components/ThemeToggle';
 import { PressableScale, enterUp, stagger } from '../../../lib/motion';
-import { colors, gradients, shadow } from '../../../lib/theme';
+import { gradients } from '../../../lib/theme';
+import { useTheme } from '../../../lib/useTheme';
+import { accesosFor } from '../../../lib/nav';
 import { formatFecha, formatFechaLarga, saludo, MESES } from '../../../lib/format';
 import type { Turno } from '../../../services';
 
 function NextTurnoCard({ t, onPress }: { t: Turno; onPress: () => void }) {
+  const { colors, shadow } = useTheme();
   const d = new Date(t.fecha);
   return (
     <PressableScale onPress={onPress} haptic="select" scaleTo={0.985} style={shadow.card} className="bg-surface rounded-card border border-slate-100 overflow-hidden">
@@ -43,6 +47,7 @@ function NextTurnoCard({ t, onPress }: { t: Turno; onPress: () => void }) {
 }
 
 export default function PacienteInicio() {
+  const { colors, shadow } = useTheme();
   const user = useAuthStore(s => s.user);
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -68,13 +73,9 @@ export default function PacienteInicio() {
     { label: 'Completados', value: completados, icon: <IconCheckCircle size={18} color="#fff" />, tone: 'warning' as const, to: '/patient/turnos' },
   ];
 
-  const acciones = [
-    { label: 'Solicitar turno', desc: 'Reservá con un médico', icon: <IconPlus size={20} color={colors.brand[600]} />, to: '/patient/solicitar' },
-    { label: 'Mis turnos', desc: 'Próximos e historial', icon: <IconCalendar size={20} color={colors.brand[600]} />, to: '/patient/turnos' },
-    { label: 'Recetas', desc: 'Tus indicaciones', icon: <IconPill size={20} color={colors.brand[600]} />, to: '/patient/recetas' },
-    { label: 'Estudios', desc: 'Subí y consultá', icon: <IconFolder size={20} color={colors.brand[600]} />, to: '/patient/estudios' },
-    { label: 'Centros y mapa', desc: 'Cómo llegar y emergencias', icon: <IconMapPin size={20} color={colors.brand[600]} />, to: '/patient/mapa' },
-  ];
+  // Los accesos salen de lib/nav.ts, la misma lista que arma las pestañas y el Menú: antes esto
+  // era una lista escrita a mano que se desincronizaba con el resto de la app.
+  const acciones = accesosFor('PATIENT');
 
   const ultimasRecetas = (recetas ?? []).slice(0, 3);
   const ultimosEstudios = (estudios ?? []).slice(0, 3);
@@ -88,36 +89,33 @@ export default function PacienteInicio() {
         contentContainerStyle={{ paddingBottom: 110 }}
         refreshControl={<RefreshControl refreshing={turnosQ.isRefetching} onRefresh={onRefresh} tintColor={colors.brand[500]} />}
       >
-        {/* Hero */}
-        <LinearGradient colors={gradients.railHero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ paddingTop: insets.top + 14 }}>
-          <View className="px-5 pb-6 pt-1">
-            <View pointerEvents="none" style={{ position: 'absolute', top: -60, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: colors.brand[500], opacity: 0.16 }} />
-            <View className="flex-row justify-end -mr-1 mb-1">
+        {/* Saludo sobre el lienzo claro. Antes era una franja con degradado verde; el verde
+            quedó como acento (el botón) y no como fondo de media pantalla. */}
+        <View className="px-5 pb-1" style={{ paddingTop: insets.top + 8 }}>
+          <View className="flex-row items-start justify-between">
+            <View className="flex-1 mr-3">
+              <Text className="text-slate-500 text-sm font-medium">{saludo()},</Text>
+              <Text className="text-slate-900 text-[26px] font-bold mt-0.5" style={{ letterSpacing: -0.52 }}>
+                {user?.nombre} {user?.apellido}
+              </Text>
+              <Text className="text-slate-400 text-[13px] mt-1 capitalize">{formatFechaLarga(new Date().toISOString())}</Text>
+            </View>
+            <View className="flex-row items-center gap-2">
+              <ThemeToggle />
               <NotificationBell />
             </View>
-            <Text className="text-brand-300 text-sm font-medium">{saludo()},</Text>
-            <Text className="text-white text-[28px] font-bold mt-1" style={{ letterSpacing: -0.6 }}>{user?.nombre} {user?.apellido}</Text>
-            <Text className="text-slate-300 text-[13px] mt-2 capitalize">{formatFechaLarga(new Date().toISOString())}</Text>
-            <View className="mt-5 flex-row">
-              <PressableScale onPress={() => router.push('/patient/solicitar')} haptic="medium" style={shadow.xs} className="flex-row items-center justify-center gap-2 bg-white rounded-field h-12 px-5">
-                <IconPlus size={18} color={colors.rail} />
-                <Text className="font-bold text-[15px]" style={{ color: colors.rail }}>Solicitar turno</Text>
-              </PressableScale>
-            </View>
           </View>
-        </LinearGradient>
-
-        {/* Stats */}
-        <View className="flex-row flex-wrap justify-between px-4 pt-4">
-          {stats.map((s, i) => (
-            <Animated.View key={s.label} entering={stagger(i)} className="w-[48%] mb-3">
-              <StatCard label={s.label} value={s.value} icon={s.icon} tone={s.tone} onPress={() => router.push(s.to as any)} />
-            </Animated.View>
-          ))}
+          <View className="mt-4 flex-row">
+            <PressableScale onPress={() => router.push('/patient/solicitar')} haptic="medium" style={shadow.xs} className="flex-row items-center justify-center gap-2 bg-brand-600 rounded-field h-12 px-5">
+              <IconPlus size={18} color="#fff" />
+              <Text className="text-white font-bold text-[15px]">Solicitar turno</Text>
+            </PressableScale>
+          </View>
         </View>
 
-        {/* Próximo turno */}
-        <Animated.View entering={enterUp(180)} className="px-4 mt-2">
+        {/* Próximo turno — primero: es el dato que el paciente viene a buscar. Antes arrancaba
+            con cuatro contadores y había que scrollear para ver cuándo era el turno. */}
+        <Animated.View entering={enterUp(80)} className="px-4 pt-4">
           <View className="flex-row items-center justify-between mb-2.5">
             <Text className="text-sm font-bold text-slate-900">Próximo turno</Text>
             <PressableScale onPress={() => router.push('/patient/turnos')} haptic={false} className="flex-row items-center gap-1">
@@ -141,19 +139,30 @@ export default function PacienteInicio() {
           )}
         </Animated.View>
 
+        {/* Stats */}
+        <View className="flex-row flex-wrap justify-between px-4 pt-4">
+          {stats.map((s, i) => (
+            <Animated.View key={s.label} entering={stagger(i, 45, 140)} className="w-[48%] mb-3">
+              <StatCard label={s.label} value={s.value} icon={s.icon} tone={s.tone} onPress={() => router.push(s.to as any)} />
+            </Animated.View>
+          ))}
+        </View>
+
         {/* Accesos rápidos */}
-        <Animated.View entering={enterUp(220)} className="px-4 mt-5">
+        <Animated.View entering={enterUp(240)} className="px-4 mt-2">
           <Text className="text-sm font-bold text-slate-900 mb-2.5">Accesos rápidos</Text>
           <View className="flex-row flex-wrap justify-between">
             {acciones.map((a) => (
               <View key={a.label} className="w-[48%] mb-3">
                 <PressableScale
-                  onPress={() => router.push(a.to as any)}
+                  onPress={() => router.push(a.to as never)}
                   haptic="select"
                   style={shadow.card}
                   className="w-full bg-surface rounded-card border border-slate-100 p-4"
                 >
-                  <View className="w-11 h-11 rounded-xl bg-brand-50 items-center justify-center mb-3">{a.icon}</View>
+                  <View className="w-11 h-11 rounded-xl bg-brand-50 items-center justify-center mb-3">
+                    <a.icon size={20} color={colors.brand[600]} />
+                  </View>
                   <Text className="font-semibold text-slate-900 text-sm">{a.label}</Text>
                   <Text className="text-[12px] text-slate-500 mt-0.5">{a.desc}</Text>
                 </PressableScale>

@@ -4,12 +4,14 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import qrcode from 'qrcode-terminal';
 import { ZodError } from 'zod';
+import { MulterError } from 'multer';
 import { Prisma } from '@prisma/client';
 
 import { PORT } from './config/env';
 import { corsOptions } from './config/cors';
 import { getNetworkIPs } from './config/network';
 import { HttpError, formatZodError, uniqueFieldMessage } from './lib/httpError';
+import { MAX_FOTO_MB } from './middlewares/uploadImagen.middleware';
 
 import authRoutes from './routes/auth.routes';
 import turnosRoutes from './routes/turnos.routes';
@@ -19,6 +21,7 @@ import recetasRoutes from './routes/recetas.routes';
 import usersRoutes from './routes/users.routes';
 import especialidadesRoutes from './routes/especialidades.routes';
 import notificationsRoutes from './routes/notifications.routes';
+import calificacionesRoutes from './routes/calificaciones.routes';
 
 const app = express();
 
@@ -42,6 +45,7 @@ app.use('/api/recetas',        recetasRoutes);
 app.use('/api/users',          usersRoutes);
 app.use('/api/especialidades', especialidadesRoutes);
 app.use('/api/notifications',  notificationsRoutes);
+app.use('/api/calificaciones', calificacionesRoutes);
 
 // Error handler global: traduce cualquier error a { error: <string> } con un status claro.
 // Así un fallo de validación o un dato duplicado NUNCA llega al front como objeto o como 500 genérico.
@@ -53,6 +57,16 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
   // Error con status explícito que lanzamos a propósito
   if (err instanceof HttpError) {
     return res.status(err.status).json({ error: err.message });
+  }
+  // Archivo demasiado grande u otro problema de multer → 413/400, nunca un 500 genérico
+  if (err instanceof MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      // El tope no es uno solo: los estudios admiten 10 MB y las fotos de perfil 2 MB.
+      // `err.field` es el nombre del campo del FormData, así que el mensaje dice el límite real.
+      const maxMb = err.field === 'foto' ? MAX_FOTO_MB : 10;
+      return res.status(413).json({ error: `El archivo supera el máximo de ${maxMb} MB` });
+    }
+    return res.status(400).json({ error: 'No se pudo procesar el archivo enviado' });
   }
   // Restricción única de la base (email/DNI/matrícula repetidos) → 409 amable
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
@@ -112,9 +126,9 @@ app.listen(PORT, '0.0.0.0', async () => {
       console.log('  aislamiento no se pueden detectar desde esta maquina.');
     }
 
-    console.log('\n  La app celular busca el servidor sola. Si no lo encuentra, abrir');
-    console.log('  "Configurar servidor" en la pantalla de ingreso y tipear esta URL');
-    console.log('  (o escanear el QR con la camara del celular para verla):');
+    console.log('\n  La app celular busca el servidor sola. Si no lo encuentra, verificar que');
+    console.log('  el telefono este en esta misma red y usar "Reintentar" en la app.');
+    console.log('  Para fijarla a mano hay que recompilar con EXPO_PUBLIC_API_URL:');
     console.log(`\n  ${lanUrl}\n`);
     qrcode.generate(lanUrl, { small: true });
   }

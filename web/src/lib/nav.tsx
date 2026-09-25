@@ -1,7 +1,8 @@
 import type { ComponentType } from 'react';
 import {
   IconGrid, IconCalendar, IconCalendarDays, IconUsers, IconStethoscope, IconTag,
-  IconChart, IconSettings, IconHome, IconPlus, IconPill, IconFolder, IconUser, IconShield, IconMapPin,
+  IconChart, IconSettings, IconHome, IconPlus, IconPill, IconFolder, IconUser, IconShield, IconMapPin, IconSparkle,
+  IconClipboard,
 } from '../ui/icons';
 
 export interface NavItem {
@@ -20,24 +21,23 @@ export const adminNav: NavGroup[] = [
     label: 'Panel',
     items: [
       { to: '/admin/dashboard', label: 'Dashboard', icon: IconGrid },
-      { to: '/admin/agenda',    label: 'Agenda',    icon: IconCalendarDays },
+      { to: '/admin/turnos',    label: 'Turnos',    icon: IconCalendar },
     ],
   },
   {
-    label: 'Gestión',
+    label: 'Cuentas',
     items: [
-      { to: '/admin/turnos',         label: 'Turnos',         icon: IconCalendar },
-      { to: '/admin/pacientes',      label: 'Pacientes',      icon: IconUsers },
+      { to: '/admin/usuarios',       label: 'Usuarios',       icon: IconShield },
       { to: '/admin/medicos',        label: 'Médicos',        icon: IconStethoscope },
       { to: '/admin/especialidades', label: 'Especialidades', icon: IconTag },
-      { to: '/admin/usuarios',       label: 'Usuarios',       icon: IconShield },
     ],
   },
   {
     label: 'Sistema',
     items: [
-      { to: '/admin/reportes', label: 'Reportes', icon: IconChart },
-      { to: '/admin/ajustes',  label: 'Ajustes',  icon: IconSettings },
+      { to: '/admin/calificaciones', label: 'Calificaciones', icon: IconSparkle },
+      { to: '/admin/reportes',       label: 'Reportes',       icon: IconChart },
+      { to: '/admin/ajustes',        label: 'Ajustes',        icon: IconSettings },
     ],
   },
 ];
@@ -76,8 +76,12 @@ export const medicoNav: NavGroup[] = [
   {
     label: 'Atención',
     items: [
-      { to: '/medico/agenda',  label: 'Mi agenda', icon: IconCalendarDays },
-      { to: '/medico/recetas', label: 'Recetas',   icon: IconPill },
+      { to: '/medico/inicio',         label: 'Inicio',             icon: IconHome },
+      { to: '/medico/agenda',         label: 'Mi agenda',          icon: IconCalendarDays },
+      { to: '/medico/turnos',         label: 'Administrar turnos', icon: IconClipboard },
+      { to: '/medico/pacientes',      label: 'Mis pacientes',      icon: IconUsers },
+      { to: '/medico/recetas',        label: 'Recetas',            icon: IconPill },
+      { to: '/medico/calificaciones', label: 'Calificaciones',     icon: IconSparkle },
     ],
   },
   {
@@ -93,7 +97,7 @@ export const navFor = (role?: string): NavGroup[] =>
 
 // Ruta de inicio según el rol (se usa al loguearse y en las redirecciones)
 export const homePath = (role?: string): string =>
-  role === 'ADMIN' ? '/admin/dashboard' : role === 'MEDICO' ? '/medico/agenda' : '/paciente/inicio';
+  role === 'ADMIN' ? '/admin/dashboard' : role === 'MEDICO' ? '/medico/inicio' : '/paciente/inicio';
 
 export const flatNav = (groups: NavGroup[]): NavItem[] =>
   groups.flatMap(g => g.items);

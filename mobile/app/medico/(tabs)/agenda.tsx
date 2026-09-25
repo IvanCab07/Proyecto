@@ -3,12 +3,16 @@ import { View, Text, FlatList } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useMiAgenda, useUpdateTurnoStatus } from '../../../hooks';
 import {
-  Card, StatusBadge, Sheet, Button, Textarea, ScreenHeader, SegmentedTabs, EmptyState, Skeleton, toast,
-  IconCalendar, IconClock, IconCalendarCheck, IconRefresh,
+  Card, Calendario, StatusBadge, Sheet, Button, Textarea, ScreenHeader, SegmentedTabs, EmptyState, Skeleton, toast,
+  HoraTurno,
+  IconCalendar, IconRefresh, IconX, IconChevronDown,
 } from '../../../components/ui';
+import type { MarcaDia } from '../../../components/ui';
 import { NotificationBell } from '../../../components/NotificationBell';
 import { PressableScale, stagger } from '../../../lib/motion';
-import { colors, STATUS, type TurnoStatus } from '../../../lib/theme';
+import { type TurnoStatus } from '../../../lib/theme';
+import { useTheme } from '../../../lib/useTheme';
+import { claveFecha, fechaDeTurno } from '../../../lib/fechas';
 import { formatFechaCorta } from '../../../lib/format';
 import type { Turno } from '../../../services';
 
@@ -20,6 +24,7 @@ const NEXT: Record<string, { label: string; status: TurnoStatus }[]> = {
 };
 
 export default function MedicoAgenda() {
+  const { colors, STATUS } = useTheme();
   const { data: turnos, isLoading } = useMiAgenda();
   const updateStatus = useUpdateTurnoStatus();
 
@@ -28,6 +33,10 @@ export default function MedicoAgenda() {
   const [selStatus, setSelStatus] = useState<TurnoStatus | ''>('');
   const [notas, setNotas] = useState('');
   const [diagnostico, setDiagnostico] = useState('');
+  const [verCalendario, setVerCalendario] = useState(false);
+  // Día elegido en el calendario ("YYYY-MM-DD"). Filtra la lista en vez de abrir un Sheet:
+  // esta es la vista de trabajo del médico, lo que quiere es ver ese día en detalle.
+  const [diaFiltro, setDiaFiltro] = useState<string | null>(null);
 
   const { proximos, historial } = useMemo(() => {
     const list = turnos ?? [];
@@ -37,7 +46,20 @@ export default function MedicoAgenda() {
     };
   }, [turnos]);
 
-  const visibles = tab === 'proximos' ? proximos : historial;
+  // El calendario marca TODA la agenda, no solo la pestaña activa: si el médico está en
+  // "Próximos" igual tiene que ver que el martes pasado atendió a alguien.
+  const marcas = useMemo(() => {
+    const out: Record<string, MarcaDia[]> = {};
+    for (const t of turnos ?? []) {
+      (out[claveFecha(t.fecha)] ??= []).push({ key: t.id, color: STATUS[t.status].dot });
+    }
+    return out;
+  }, [turnos, STATUS]);
+
+  const visibles = useMemo(() => {
+    const base = tab === 'proximos' ? proximos : historial;
+    return diaFiltro ? base.filter(t => claveFecha(t.fecha) === diaFiltro) : base;
+  }, [tab, proximos, historial, diaFiltro]);
 
   const openModal = (t: Turno) => { setModalTurno(t); setSelStatus(''); setNotas(t.notas ?? ''); setDiagnostico(t.diagnostico ?? ''); };
 
@@ -54,6 +76,47 @@ export default function MedicoAgenda() {
 
   const header = (
     <View className="pt-4 pb-1">
+      <PressableScale
+        onPress={() => setVerCalendario(v => !v)}
+        haptic="select"
+        className="flex-row items-center justify-between rounded-xl bg-surface border border-slate-100 px-3.5 py-2.5 mb-3"
+      >
+        <View className="flex-row items-center gap-2">
+          <IconCalendar size={15} color={colors.brand[600]} />
+          <Text className="text-[13px] font-bold text-slate-700">Calendario del mes</Text>
+        </View>
+        <View style={{ transform: [{ rotate: verCalendario ? '180deg' : '0deg' }] }}>
+          <IconChevronDown size={17} color={colors.slate[500]} />
+        </View>
+      </PressableScale>
+
+      {verCalendario ? (
+        <View className="mb-3">
+          <Calendario
+            densidad="compacta"
+            titulo="Tu agenda"
+            ayuda="Tocá un día para ver solo esos turnos."
+            marcas={marcas}
+            seleccion={diaFiltro}
+            deshabilitar={(fecha) => !marcas[fecha]}
+            onSelect={(fecha) => setDiaFiltro(actual => (actual === fecha ? null : fecha))}
+          />
+        </View>
+      ) : null}
+
+      {diaFiltro ? (
+        <PressableScale
+          onPress={() => setDiaFiltro(null)}
+          haptic="select"
+          className="flex-row items-center justify-between rounded-pill bg-brand-50 border border-brand-100 px-3.5 py-2 mb-3"
+        >
+          <Text className="text-[12px] font-bold text-brand-700">
+            Viendo el {formatFechaCorta(fechaDeTurno(diaFiltro).toISOString())}
+          </Text>
+          <IconX size={14} color={colors.brand[700]} />
+        </PressableScale>
+      ) : null}
+
       <SegmentedTabs
         value={tab}
         onChange={setTab}
@@ -82,8 +145,16 @@ export default function MedicoAgenda() {
             <EmptyState
               className="pt-10"
               icon={<IconCalendar size={28} color={colors.brand[500]} />}
-              title={tab === 'proximos' ? 'Sin turnos próximos' : 'Sin historial'}
-              message={tab === 'proximos' ? 'Cuando te asignen turnos van a aparecer acá.' : 'Acá vas a ver los turnos completados y cancelados.'}
+              title={
+                diaFiltro
+                  ? 'Sin turnos ese día'
+                  : tab === 'proximos' ? 'Sin turnos próximos' : 'Sin historial'
+              }
+              message={
+                diaFiltro
+                  ? `No hay turnos ${tab === 'proximos' ? 'próximos' : 'del historial'} ese día. Tocá la cruz para ver todos.`
+                  : tab === 'proximos' ? 'Cuando te asignen turnos van a aparecer acá.' : 'Acá vas a ver los turnos completados y cancelados.'
+              }
             />
           }
           renderItem={({ item, index }) => <MedicoTurnoCard item={item} index={index} onChangeStatus={() => openModal(item)} />}
@@ -103,9 +174,9 @@ export default function MedicoAgenda() {
                 const sel = selStatus === opt.status;
                 const tone = STATUS[opt.status];
                 return (
-                  <PressableScale key={opt.status} onPress={() => setSelStatus(opt.status)} haptic="select"
-                    style={{ borderWidth: 1.5, borderColor: sel ? tone.strip : colors.slate[200], backgroundColor: sel ? tone.soft : colors.white }}
-                    className="flex-1 items-center py-3.5 rounded-field">
+                  <PressableScale key={opt.status} fill onPress={() => setSelStatus(opt.status)} haptic="select"
+                    style={{ borderWidth: 1.5, borderColor: sel ? tone.strip : colors.slate[200], backgroundColor: sel ? tone.soft : colors.surface }}
+                    className="items-center py-3.5 rounded-field">
                     <Text className="font-bold text-sm" style={{ color: sel ? tone.pillText : colors.slate[600] }}>{opt.label}</Text>
                   </PressableScale>
                 );
@@ -133,23 +204,19 @@ function InfoBox({ tone, label, text }: { tone: { soft: string; DEFAULT: string;
 }
 
 function MedicoTurnoCard({ item, index, onChangeStatus }: { item: Turno; index: number; onChangeStatus: () => void }) {
-  const s = STATUS[item.status] ?? STATUS.PENDIENTE;
+  const { colors } = useTheme();
   const nextOpts = NEXT[item.status] ?? [];
   return (
     <Animated.View entering={stagger(index)}>
       <Card className="overflow-hidden flex-row">
-        <View style={{ width: 4, backgroundColor: s.strip }} />
+        <HoraTurno hora={item.hora} fecha={item.fecha} />
         <View className="flex-1 p-4">
-          <View className="flex-row items-start justify-between mb-2">
+          <View className="flex-row items-start justify-between mb-1">
             <View className="flex-1 mr-2">
               <Text className="text-[15px] font-bold text-slate-900" style={{ letterSpacing: -0.3 }}>{item.paciente?.apellido}, {item.paciente?.nombre}</Text>
               <Text className="text-[12px] text-slate-400 mt-0.5">DNI {item.paciente?.dni}</Text>
             </View>
             <StatusBadge status={item.status} />
-          </View>
-          <View className="flex-row items-center gap-4">
-            <View className="flex-row items-center gap-1.5"><IconCalendarCheck size={12} color={colors.slate[400]} /><Text className="text-[12px] text-slate-500 font-semibold capitalize">{formatFechaCorta(item.fecha)}</Text></View>
-            <View className="flex-row items-center gap-1.5"><IconClock size={12} color={colors.slate[400]} /><Text className="text-[12px] text-slate-600 font-bold">{item.hora} hs</Text></View>
           </View>
           {item.motivo ? <Text className="text-[12px] text-slate-400 mt-2">Motivo: {item.motivo}</Text> : null}
           {item.notas ? <InfoBox tone={colors.info} label="Nota" text={item.notas} /> : null}

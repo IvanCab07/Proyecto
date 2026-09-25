@@ -1,6 +1,6 @@
 import type { Transition, Variants } from 'motion/react';
 
-// Sistema de motion del rediseño "Teal Clinical Dashboard".
+// Sistema de motion del rediseño "EMS Green".
 // Reglas: solo transform/opacity, entradas rápidas con ease-out,
 // salidas más cortas que las entradas, springs solo para layout/gestos.
 

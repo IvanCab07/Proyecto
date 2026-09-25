@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { authService } from '../../services';
 import { apiError } from '../../lib/apiError';
 import { useAuthStore } from '../../store/useAuthStore';
-import { AuthLayout, AUTH_FEATURES } from './AuthLayout';
+import { AuthLayout } from './AuthLayout';
 import { Spinner } from '../../ui';
 import { IconAlert, IconCheckCircle } from '../../ui/icons';
 
@@ -43,7 +43,7 @@ export default function VerifyEmail() {
     <AuthLayout
       headline={<>Tu cuenta, <em className="not-italic text-brand-300">verificada</em>.</>}
       tagline="Confirmamos tu dirección de email para mantener tu cuenta segura."
-      features={AUTH_FEATURES}
+      image="register"
     >
       <div className="text-center">
         {estado === 'verificando' && (

@@ -4,7 +4,131 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Sistema de diseño "EMS Green".
+ * Todos los tokens son canales RGB sueltos ("34 197 94") para que Tailwind
+ * pueda componer opacidad: bg-brand-500/15, ring-success/20, etc.
+ *
+ * La rampa `slate` se invierte en modo oscuro: así `text-slate-900` (texto
+ * principal) o `bg-slate-100` (chips) se adaptan al tema sin tocar las páginas.
+ * Lo que vive sobre el rail verde usa `rail-fg`, que NO se invierte.
+ */
 @layer base {
+  :root {
+    /* Superficies */
+    --canvas:  248 250 249;
+    --surface: 255 255 255;
+    --scrim:     2   6  23;
+
+    /* Rail / sidebar — verde bosque, idéntico en ambos temas */
+    --rail:      44  95  78;
+    --rail-soft: 58 107  90;
+    --rail-fg:  255 255 255;
+    --rail-mint:123 220 147;
+
+    /* Marca — verde EMS */
+    --brand-50:  240 253 244;
+    --brand-100: 220 252 231;
+    --brand-200: 187 247 208;
+    --brand-300: 123 220 147;
+    --brand-400:  74 222 128;
+    --brand-500:  34 197  94;
+    --brand-600:  22 163  74;
+    --brand-700:  21 128  61;
+    --brand-800:  22 101  52;
+    --brand-900:  20  83  45;
+    --brand-950:   5  46  22;
+
+    /* Ámbar: sobreturnos y estrellas de calificación */
+    --amber-50:  255 251 235;
+    --amber-100: 254 243 199;
+    --amber-200: 253 230 138;
+    --amber-300: 252 211  77;
+    --amber-400: 251 191  36;
+    --amber-500: 245 158  11;
+    --amber-600: 217 119   6;
+    --amber-700: 180  83   9;
+    --amber-800: 146  64  14;
+    --amber-900: 120  53  15;
+    --amber-950:  69  26   3;
+
+    /* Neutros */
+    --slate-50:  248 250 252;
+    --slate-100: 241 245 249;
+    --slate-200: 226 232 240;
+    --slate-300: 203 213 225;
+    --slate-400: 148 163 184;
+    --slate-500: 100 116 139;
+    --slate-600:  71  85 105;
+    --slate-700:  51  65  85;
+    --slate-800:  30  41  59;
+    --slate-900:  15  23  42;
+    --slate-950:   2   6  23;
+
+    /* Semánticos por estado de turno */
+    --success:      22 163  74;
+    --success-soft:220 252 231;
+    --success-text: 21 128  61;
+    --warning:     217 119   6;
+    --warning-soft:254 243 199;
+    --warning-text:180  83   9;
+    --danger:      220  38  38;
+    --danger-soft: 254 226 226;
+    --danger-text: 185  28  28;
+    --info:         14 165 233;
+    --info-soft:   224 242 254;
+    --info-text:     3 105 161;
+  }
+
+  .dark {
+    --canvas:   15  23  42;
+    --surface:  30  41  59;
+
+    /* Extremos de marca invertidos: los tintes se oscurecen, los oscuros aclaran */
+    --brand-50:  14  42  27;
+    --brand-100: 20  83  45;
+    --brand-200: 22 101  52;
+    --brand-800:134 239 172;
+    --brand-900:187 247 208;
+    --brand-950:220 252 231;
+
+    /* Ámbar: mismos extremos invertidos que la marca (400-500 no se tocan) */
+    --amber-50:   58  43  16;
+    --amber-100:  74  54  18;
+    --amber-200: 120  53  15;
+    --amber-600: 251 191  36;
+    --amber-700: 252 211  77;
+    --amber-800: 253 230 138;
+    --amber-900: 254 243 199;
+    --amber-950: 255 251 235;
+
+    /* Rampa de neutros invertida */
+    --slate-50:   30  41  59;
+    --slate-100:  39  53  72;
+    --slate-200:  51  65  85;
+    --slate-300:  71  85 105;
+    --slate-400: 124 142 168;
+    --slate-500: 148 163 184;
+    --slate-600: 180 192 206;
+    --slate-700: 203 213 225;
+    --slate-800: 226 232 240;
+    --slate-900: 241 245 249;
+    --slate-950: 248 250 252;
+
+    --success:      34 197  94;
+    --success-soft: 20  50  31;
+    --success-text: 74 222 128;
+    --warning:     245 158  11;
+    --warning-soft: 58  43  16;
+    --warning-text:251 191  36;
+    --danger:      239  68  68;
+    --danger-soft:  58  26  26;
+    --danger-text: 248 113 113;
+    --info:         56 189 248;
+    --info-soft:    16  41  58;
+    --info-text:   125 211 252;
+  }
+
   * {
     @apply border-slate-200;
     box-sizing: border-box;
@@ -21,7 +145,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid #0D9488;
+    outline: 2px solid rgb(var(--brand-500));
     outline-offset: 2px;
     border-radius: 6px;
   }
@@ -31,8 +155,9 @@
   }
 
   ::selection {
-    background: #9EF2E3;
-    color: #0C1C1C;
+    background: rgb(var(--brand-200));
+    background: rgb(var(--brand-300) / 0.45);
+    color: rgb(var(--slate-900));
   }
 
   ::-webkit-scrollbar {
@@ -41,7 +166,7 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background-color: #CBD5E1;
+    background-color: rgb(var(--slate-300));
     border-radius: 999px;
     border: 3px solid transparent;
     background-clip: content-box;
@@ -53,7 +178,12 @@
 
   html {
     scrollbar-width: thin;
-    scrollbar-color: #CBD5E1 transparent;
+    scrollbar-color: rgb(var(--slate-300)) transparent;
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
   }
 }
 
@@ -61,10 +191,126 @@
   .tnum {
     font-variant-numeric: tabular-nums;
   }
+
+  /*
+   * brand-600 y brand-700 son ambiguos: se usan como fondo sólido con texto
+   * blanco (chips, stepper, botones) Y como color de texto de acento sobre
+   * superficies claras. Como token no pueden ser dos cosas a la vez, en oscuro
+   * se aclara únicamente su versión "texto"; los fondos quedan intactos.
+   */
+  .dark .text-brand-600 { color: rgb(var(--brand-400)); }
+  .dark .text-brand-700 { color: rgb(var(--brand-300)); }
+  .dark .hover\:text-brand-600:hover { color: rgb(var(--brand-400)); }
+  .dark .hover\:text-brand-700:hover { color: rgb(var(--brand-300)); }
+  .dark .group:hover .group-hover\:text-brand-600 { color: rgb(var(--brand-400)); }
+  /* Los chips que en hover pasan a fondo brand-600 sí necesitan texto blanco. */
+  .dark .group:hover .group-hover\:text-white { color: #fff; }
+
+  /* Degradados del sistema EMS */
+  .gradient-sidebar {
+    background: linear-gradient(160deg, rgb(var(--rail)) 0%, rgb(var(--rail)) 45%, rgb(var(--rail-soft)) 100%);
+  }
+
+  .gradient-card {
+    background: linear-gradient(135deg, rgb(var(--rail)) 0%, rgb(var(--rail-soft)) 50%, rgb(var(--rail)) 100%);
+  }
+
+  .gradient-primary {
+    background: linear-gradient(135deg, rgb(var(--brand-300)) 0%, rgb(var(--brand-400)) 100%);
+  }
+
+  .gradient-glow {
+    box-shadow: 0 0 20px rgb(var(--rail-mint) / 0.30), 0 0 40px rgb(var(--rail-mint) / 0.10);
+  }
+}
+
+/*
+ * Leaflet en modo oscuro. Los tiles de OpenStreetMap solo existen en versión
+ * clara, así que se invierten por CSS; el filtro se aplica al panel de tiles
+ * únicamente, para no tocar los pines ni los popups.
+ */
+.dark .leaflet-dark .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9) saturate(0.8);
+}
+
+.dark .leaflet-popup-content-wrapper,
+.dark .leaflet-popup-tip {
+  background: rgb(var(--surface));
+  color: rgb(var(--slate-900));
+}
+
+.dark .leaflet-container a.leaflet-popup-close-button {
+  color: rgb(var(--slate-500));
+}
+
+.dark .leaflet-control-zoom a {
+  background: rgb(var(--surface));
+  color: rgb(var(--slate-800));
+  border-color: rgb(var(--slate-200));
+}
+
+.dark .leaflet-control-attribution {
+  background: rgb(var(--surface) / 0.8);
+  color: rgb(var(--slate-500));
+}
+
+.dark .leaflet-control-attribution a {
+  color: rgb(var(--brand-400));
+}
+
+/*
+ * Impresión. Lo único que se imprime es el bloque marcado con `data-print-area`
+ * (hoy, la receta del paciente). Se usa `visibility` y no `display` a propósito: el
+ * diálogo se monta en un portal al final del <body>, así que ocultar por display haría
+ * desaparecer también a sus ancestros y con ellos la receta.
+ */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  [data-print-area],
+  [data-print-area] * {
+    visibility: visible;
+  }
+
+  [data-print-area] {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  /* El scrim del diálogo sigue ocupando la hoja aunque no se vea */
+  .bg-scrim\/60 {
+    display: none;
+  }
+
+  /* Forzar tema claro: el fondo oscuro no se imprime y dejaría el texto ilegible */
+  :root {
+    color-scheme: light;
+  }
+}
+
+/* Pulso del indicador activo del sidebar */
+@keyframes activeIndicator {
+  0%   { transform: scale(0.85); opacity: 0.5; }
+  50%  { transform: scale(1.1);  opacity: 1; }
+  100% { transform: scale(1);    opacity: 0.8; }
+}
+
+.active-indicator {
+  animation: activeIndicator 2s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .animate-shimmer {
+    animation: none;
+  }
+
+  .active-indicator {
     animation: none;
   }
 }

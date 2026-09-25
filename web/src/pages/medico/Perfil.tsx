@@ -6,20 +6,42 @@ import { apiError } from '../../lib/apiError';
 import { useAuthStore } from '../../store/useAuthStore';
 import {
   useActualizarPerfil, useCambiarPassword, useMiAgenda, useRecetasMedico,
+  useMiFichaMedico, useActualizarMiDisponibilidad,
 } from '../../hooks';
 import { PageTransition } from '../../components/PageTransition';
 import { SeguridadCard } from '../../components/SeguridadCard';
-import { Card, Button, Dialog, Input, PasswordInput, PageHeader, StatCard } from '../../ui';
+import { Card, Button, Dialog, Input, PasswordInput, PageHeader, StatCard, AlertInline } from '../../ui';
+import { FotoPerfil } from '../../components/FotoPerfil';
 import {
-  IconEdit, IconKey, IconAlert, IconIdCard, IconPhone, IconShield,
-  IconCalendar, IconCheckCircle, IconPill, IconArrowRight,
+  IconEdit, IconKey, IconIdCard, IconPhone, IconShield,
+  IconCalendar, IconCheckCircle, IconPill, IconArrowRight, IconStethoscope,
 } from '../../ui/icons';
-import { iniciales } from '../../lib/format';
+import { useFormulario } from '../../lib/useFormulario';
+import {
+  LIMITES, limpiar, formatearTelefono,
+  validarNombre, validarTelefono, validarPassword, validarConfirmacion,
+} from '../../lib/validaciones';
 
 const ACCESOS = [
   { label: 'Mi agenda', desc: 'Turnos y diagnósticos', icon: <IconCalendar />, to: '/medico/agenda' },
   { label: 'Recetas',   desc: 'Emití y consultá',      icon: <IconPill />, to: '/medico/recetas' },
 ];
+
+function DisponibleSwitch({ checked, onChange, disabled }: { checked: boolean; onChange: () => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={checked ? 'Marcarme como no disponible' : 'Marcarme como disponible'}
+      disabled={disabled}
+      onClick={onChange}
+      className={`w-11 h-6 rounded-pill p-0.5 flex items-center transition-colors duration-200 disabled:opacity-50 ${checked ? 'bg-success justify-end' : 'bg-slate-300 justify-start'}`}
+    >
+      <span className="w-5 h-5 rounded-full bg-white shadow-xs" />
+    </button>
+  );
+}
 
 export default function MedicoPerfil() {
   const { user } = useAuthStore();
@@ -27,13 +49,41 @@ export default function MedicoPerfil() {
   const cambiarPassword = useCambiarPassword();
   const { data: agenda } = useMiAgenda();
   const { data: recetas } = useRecetasMedico();
+  const { data: ficha } = useMiFichaMedico();
+  const toggleDisponible = useActualizarMiDisponibilidad();
+
+  const disponible = ficha?.disponible ?? false;
+  const handleToggleDisponible = async () => {
+    try {
+      await toggleDisponible.mutateAsync(!disponible);
+      toast.success(!disponible ? 'Quedaste disponible para nuevos turnos' : 'Te marcaste como no disponible');
+    } catch {
+      toast.error('No se pudo actualizar la disponibilidad');
+    }
+  };
 
   const [modalPerfil, setModalPerfil] = useState(false);
   const [modalPwd, setModalPwd] = useState(false);
-  const [perfilForm, setPerfilForm] = useState({ nombre: '', apellido: '', telefono: '' });
-  const [pwdForm, setPwdForm] = useState({ passwordActual: '', passwordNueva: '', confirm: '' });
   const [perfilError, setPerfilError] = useState('');
   const [pwdError, setPwdError] = useState('');
+
+  const perfil = useFormulario(
+    { nombre: '', apellido: '', telefono: '' },
+    {
+      nombre:   v => validarNombre(v, 'El nombre'),
+      apellido: v => validarNombre(v, 'El apellido'),
+      telefono: validarTelefono,
+    },
+  );
+
+  const pwd = useFormulario(
+    { passwordActual: '', passwordNueva: '', confirm: '' },
+    {
+      passwordActual: v => (v ? undefined : 'Ingresá tu contraseña actual'),
+      passwordNueva:  validarPassword,
+      confirm:        (v, todos) => validarConfirmacion(todos.passwordNueva, v),
+    },
+  );
 
   const today = new Date().toISOString().slice(0, 10);
   const proximos = (agenda ?? []).filter(
@@ -42,12 +92,14 @@ export default function MedicoPerfil() {
   const completados = (agenda ?? []).filter(t => t.status === 'COMPLETADO').length;
 
   const abrirPerfil = () => {
-    setPerfilForm({ nombre: user?.nombre ?? '', apellido: user?.apellido ?? '', telefono: user?.telefono ?? '' });
+    perfil.reiniciar({
+      nombre: user?.nombre ?? '', apellido: user?.apellido ?? '', telefono: user?.telefono ?? '',
+    });
     setPerfilError('');
     setModalPerfil(true);
   };
   const abrirPwd = () => {
-    setPwdForm({ passwordActual: '', passwordNueva: '', confirm: '' });
+    pwd.reiniciar();
     setPwdError('');
     setModalPwd(true);
   };
@@ -55,8 +107,14 @@ export default function MedicoPerfil() {
   const handlePerfil = async (e: FormEvent) => {
     e.preventDefault();
     setPerfilError('');
+    if (!perfil.validarTodo()) return;
+
     try {
-      await actualizarPerfil.mutateAsync({ nombre: perfilForm.nombre, apellido: perfilForm.apellido, telefono: perfilForm.telefono || undefined });
+      await actualizarPerfil.mutateAsync({
+        nombre: limpiar(perfil.valores.nombre),
+        apellido: limpiar(perfil.valores.apellido),
+        telefono: perfil.valores.telefono.trim() || undefined,
+      });
       toast.success('Datos actualizados');
       setModalPerfil(false);
     } catch (err) {
@@ -67,10 +125,13 @@ export default function MedicoPerfil() {
   const handlePwd = async (e: FormEvent) => {
     e.preventDefault();
     setPwdError('');
-    if (pwdForm.passwordNueva !== pwdForm.confirm) return setPwdError('Las contraseñas no coinciden');
-    if (pwdForm.passwordNueva.length < 6) return setPwdError('La nueva contraseña debe tener al menos 6 caracteres');
+    if (!pwd.validarTodo()) return;
+
     try {
-      await cambiarPassword.mutateAsync({ passwordActual: pwdForm.passwordActual, passwordNueva: pwdForm.passwordNueva });
+      await cambiarPassword.mutateAsync({
+        passwordActual: pwd.valores.passwordActual,
+        passwordNueva: pwd.valores.passwordNueva,
+      });
       toast.success('Contraseña actualizada');
       setModalPwd(false);
     } catch (err) {
@@ -80,6 +141,8 @@ export default function MedicoPerfil() {
 
   const rows = [
     { label: 'DNI', value: user?.dni || '—', icon: <IconIdCard /> },
+    { label: 'Matrícula', value: ficha?.matricula || '—', icon: <IconIdCard /> },
+    { label: 'Especialidad', value: ficha?.especialidad?.nombre || '—', icon: <IconStethoscope /> },
     { label: 'Teléfono', value: user?.telefono || 'No registrado', icon: <IconPhone /> },
     { label: 'Rol', value: 'Médico', icon: <IconShield /> },
   ];
@@ -91,14 +154,9 @@ export default function MedicoPerfil() {
       <div className="grid gap-4 lg:grid-cols-3 items-start">
         {/* Tarjeta de cuenta */}
         <Card className="overflow-hidden lg:row-span-2">
-          <div className="bg-rail bg-gradient-to-br from-[#0C2422] via-rail to-[#0A1615] h-20" />
+          <div className="gradient-card h-20" />
           <div className="px-6 pb-6">
-            <div className="flex items-end gap-4 -mt-8">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 text-white grid place-items-center font-bold text-2xl select-none shrink-0 ring-4 ring-surface shadow-glow-brand">
-                {iniciales(user?.nombre, user?.apellido)}
-              </div>
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-pill bg-brand-100 text-brand-800 mb-1">Médico</span>
-            </div>
+            <FotoPerfil etiquetaRol="Médico" />
             <p className="font-bold text-slate-900 text-lg tracking-tightish leading-tight truncate mt-3">
               {user?.nombre} {user?.apellido}
             </p>
@@ -130,6 +188,24 @@ export default function MedicoPerfil() {
           <StatCard label="Recetas emitidas" value={recetas?.length ?? 0} icon={<IconPill />} tone="accent" />
         </div>
 
+        {/* Disponibilidad */}
+        <Card className="lg:col-span-2 p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className={`w-10 h-10 rounded-xl grid place-items-center shrink-0 [&>svg]:w-5 [&>svg]:h-5 ${disponible ? 'bg-success-soft text-success-text' : 'bg-slate-100 text-slate-400'}`}>
+                <IconStethoscope />
+              </span>
+              <div className="min-w-0">
+                <p className="font-semibold text-slate-900 text-sm">Disponibilidad para turnos</p>
+                <p className="text-[13px] text-slate-500">
+                  {disponible ? 'Los pacientes pueden solicitarte turnos.' : 'No aparecés disponible para nuevos turnos.'}
+                </p>
+              </div>
+            </div>
+            <DisponibleSwitch checked={disponible} disabled={toggleDisponible.isPending} onChange={handleToggleDisponible} />
+          </div>
+        </Card>
+
         {/* Accesos rápidos */}
         <Card className="lg:col-span-2 p-5">
           <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
@@ -160,16 +236,19 @@ export default function MedicoPerfil() {
       </div>
 
       <Dialog open={modalPerfil} onClose={() => setModalPerfil(false)} title="Editar datos">
-        <form onSubmit={handlePerfil} className="space-y-4">
-          <Input label="Nombre" required value={perfilForm.nombre} onChange={e => setPerfilForm(p => ({ ...p, nombre: e.target.value }))} />
-          <Input label="Apellido" required value={perfilForm.apellido} onChange={e => setPerfilForm(p => ({ ...p, apellido: e.target.value }))} />
-          <Input label="Teléfono" hint="Opcional" value={perfilForm.telefono} onChange={e => setPerfilForm(p => ({ ...p, telefono: e.target.value }))} />
-          {perfilError && (
-            <div className="flex items-center gap-2.5 bg-danger-soft text-danger-text rounded-field px-3.5 py-3 text-[13px] font-medium">
-              <IconAlert className="shrink-0" />
-              {perfilError}
-            </div>
-          )}
+        <form onSubmit={handlePerfil} className="space-y-4" noValidate>
+          <Input label="Nombre" required maxLength={LIMITES.nombre} {...perfil.campo('nombre')} />
+          <Input label="Apellido" required maxLength={LIMITES.apellido} {...perfil.campo('apellido')} />
+          <Input
+            label="Teléfono"
+            type="tel"
+            hint="Opcional"
+            maxLength={LIMITES.telefono}
+            placeholder="11 1234-5678"
+            {...perfil.campo('telefono')}
+            onChange={e => perfil.setCampo('telefono', formatearTelefono(e.target.value))}
+          />
+          {perfilError && <AlertInline>{perfilError}</AlertInline>}
           <div className="flex justify-end gap-2.5 pt-2">
             <Button type="button" variant="secondary" onClick={() => setModalPerfil(false)}>Cancelar</Button>
             <Button type="submit" loading={actualizarPerfil.isPending}>Guardar</Button>
@@ -178,16 +257,11 @@ export default function MedicoPerfil() {
       </Dialog>
 
       <Dialog open={modalPwd} onClose={() => setModalPwd(false)} title="Cambiar contraseña">
-        <form onSubmit={handlePwd} className="space-y-4">
-          <PasswordInput label="Contraseña actual" required autoComplete="current-password" value={pwdForm.passwordActual} onChange={e => setPwdForm(p => ({ ...p, passwordActual: e.target.value }))} />
-          <PasswordInput label="Nueva contraseña" required autoComplete="new-password" hint="Mínimo 6 caracteres" value={pwdForm.passwordNueva} onChange={e => setPwdForm(p => ({ ...p, passwordNueva: e.target.value }))} />
-          <PasswordInput label="Confirmar nueva contraseña" required autoComplete="new-password" value={pwdForm.confirm} onChange={e => setPwdForm(p => ({ ...p, confirm: e.target.value }))} />
-          {pwdError && (
-            <div className="flex items-center gap-2.5 bg-danger-soft text-danger-text rounded-field px-3.5 py-3 text-[13px] font-medium">
-              <IconAlert className="shrink-0" />
-              {pwdError}
-            </div>
-          )}
+        <form onSubmit={handlePwd} className="space-y-4" noValidate>
+          <PasswordInput label="Contraseña actual" required autoComplete="current-password" maxLength={LIMITES.password} {...pwd.campo('passwordActual')} />
+          <PasswordInput label="Nueva contraseña" required autoComplete="new-password" maxLength={LIMITES.password} hint={`Mínimo ${LIMITES.passwordMin} caracteres`} {...pwd.campo('passwordNueva')} />
+          <PasswordInput label="Confirmar nueva contraseña" required autoComplete="new-password" maxLength={LIMITES.password} {...pwd.campo('confirm')} />
+          {pwdError && <AlertInline>{pwdError}</AlertInline>}
           <div className="flex justify-end gap-2.5 pt-2">
             <Button type="button" variant="secondary" onClick={() => setModalPwd(false)}>Cancelar</Button>
             <Button type="submit" loading={cambiarPassword.isPending}>Cambiar contraseña</Button>

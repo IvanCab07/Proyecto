@@ -1,29 +1,35 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
-import { formatZodError } from '../lib/httpError';
+import { HttpError, formatZodError } from '../lib/httpError';
+import { nombreSchema, matriculaSchema } from '../lib/validaciones';
+import { conRating } from '../lib/ratings';
 
 const medicoSchema = z.object({
-  nombre:        z.string().min(2),
-  apellido:      z.string().min(2),
-  matricula:     z.string().min(4),
+  nombre:        nombreSchema,
+  apellido:      nombreSchema,
+  matricula:     matriculaSchema,
   especialidadId: z.string().uuid(),
 });
 
 const actualizarMedicoSchema = z.object({
-  nombre:     z.string().min(2).optional(),
-  apellido:   z.string().min(2).optional(),
+  nombre:     nombreSchema.optional(),
+  apellido:   nombreSchema.optional(),
   disponible: z.boolean().optional(),
 });
 
-// Pacientes y admins: médicos disponibles
+const miDisponibilidadSchema = z.object({
+  disponible: z.boolean(),
+});
+
+// Pacientes y admins: médicos disponibles (con su calificación, para poder elegir informado)
 export const getMedicosDisponibles = async (_req: Request, res: Response) => {
   const medicos = await prisma.medico.findMany({
     where: { disponible: true },
     include: { especialidad: true },
     orderBy: { apellido: 'asc' },
   });
-  return res.json(medicos);
+  return res.json(await conRating(medicos));
 };
 
 // Pacientes y admins: médicos disponibles de una especialidad
@@ -31,8 +37,9 @@ export const getMedicosPorEspecialidad = async (req: Request, res: Response) => 
   const medicos = await prisma.medico.findMany({
     where: { especialidadId: req.params.especialidadId, disponible: true },
     include: { especialidad: true },
+    orderBy: { apellido: 'asc' },
   });
-  return res.json(medicos);
+  return res.json(await conRating(medicos));
 };
 
 // Admin: todos los médicos (incluye no disponibles)
@@ -51,12 +58,16 @@ export const crearMedico = async (req: Request, res: Response) => {
     return res.status(400).json({ error: formatZodError(result.error) });
   }
 
+  // matriculaSchema ya la deja recortada y en mayúsculas
   const { nombre, apellido, matricula, especialidadId } = result.data;
 
   const existente = await prisma.medico.findUnique({ where: { matricula } });
   if (existente) {
     return res.status(409).json({ error: 'Ya existe un médico con esa matrícula' });
   }
+
+  const esp = await prisma.especialidad.findUnique({ where: { id: especialidadId } });
+  if (!esp) throw new HttpError(404, 'La especialidad seleccionada no existe');
 
   const medico = await prisma.medico.create({
     data: { nombre, apellido, matricula, especialidadId },
@@ -87,6 +98,35 @@ export const actualizarMedico = async (req: Request, res: Response) => {
   return res.json(medico);
 };
 
+// Médico: su propia ficha (matrícula, especialidad, disponibilidad)
+export const getMiFichaMedico = async (req: Request, res: Response) => {
+  const medico = await prisma.medico.findUnique({
+    where: { userId: req.user!.userId },
+    include: { especialidad: true },
+  });
+  if (!medico) throw new HttpError(403, 'Tu cuenta no está vinculada a una ficha de médico');
+  return res.json(medico);
+};
+
+// Médico: cambiar su propia disponibilidad
+export const actualizarMiDisponibilidad = async (req: Request, res: Response) => {
+  const result = miDisponibilidadSchema.safeParse(req.body);
+  if (!result.success) {
+    return res.status(400).json({ error: formatZodError(result.error) });
+  }
+
+  const medico = await prisma.medico.findUnique({ where: { userId: req.user!.userId } });
+  if (!medico) throw new HttpError(403, 'Tu cuenta no está vinculada a una ficha de médico');
+
+  const actualizado = await prisma.medico.update({
+    where: { id: medico.id },
+    data: { disponible: result.data.disponible },
+    include: { especialidad: true },
+  });
+
+  return res.json(actualizado);
+};
+
 // Horarios ocupados de un médico en una fecha (para elegir turno)
 export const getDisponibilidad = async (req: Request, res: Response) => {
   const { id } = req.params;
@@ -109,7 +149,22 @@ export const getDisponibilidad = async (req: Request, res: Response) => {
     select: { hora: true },
   });
 
-  return res.json({ horasOcupadas: turnos.map(t => t.hora) });
+  // Sobreturnos en espera por hora (para mostrar "N en espera" al elegir un horario ocupado)
+  const enEspera = await prisma.turno.findMany({
+    where: {
+      medicoId: id,
+      fecha: { gte: inicioFecha, lte: finFecha },
+      status: 'EN_ESPERA',
+    },
+    select: { hora: true },
+  });
+
+  const sobreturnos: Record<string, number> = {};
+  for (const t of enEspera) {
+    sobreturnos[t.hora] = (sobreturnos[t.hora] ?? 0) + 1;
+  }
+
+  return res.json({ horasOcupadas: turnos.map(t => t.hora), sobreturnos });
 };
 
 // Admin: eliminar médico (solo si no tiene turnos pendientes/confirmados)
