@@ -26,6 +26,7 @@ export const LIMITES = {
   // bcrypt solo mira los primeros 72 bytes de la contraseña y descarta el resto en silencio.
   // Cortar acá evita que alguien crea tener una contraseña más larga de la que realmente vale.
   passwordMax: 72,
+  obraSocial: 50,
 } as const;
 
 // Letras (con acentos y ñ) separadas por un único espacio, apóstrofo o guion.
@@ -65,6 +66,13 @@ export const especialidadNombreSchema = z
   .trim()
   .min(3)
   .max(LIMITES.especialidad)
+  .regex(RE_ESPECIALIDAD, 'solo puede tener letras, espacios y guiones');
+
+  export const obraSocialNombreSchema = z
+  .string()
+  .trim()
+  .min(3)
+  .max(LIMITES.obraSocial)
   .regex(RE_ESPECIALIDAD, 'solo puede tener letras, espacios y guiones');
 
 export const dniSchema = z
