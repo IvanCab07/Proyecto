@@ -9,6 +9,7 @@ import {
 } from '../../components/ui';
 import { SeguridadSection } from '../../components/SeguridadSection';
 import { FotoPerfilPicker } from '../../components/FotoPerfilPicker';
+import { ObraSocialResumen } from '../../components/ObraSocialResumen';
 import { PressableScale } from '../../lib/motion';
 import { useTheme } from '../../lib/useTheme';
 import { apiError } from '../../lib/apiError';
@@ -93,6 +94,11 @@ export default function PerfilScreen() {
             <DataRow label="Teléfono" value={user?.telefono || 'No registrado'} />
             <DataRow label="Rol" value="Paciente" last />
           </Card>
+        </View>
+
+        {/* Obra social: resumen de la cobertura; se edita en su propia pantalla */}
+        <View className="px-4 mt-3.5">
+          <ObraSocialResumen user={user} onEditar={() => router.push('/patient/obra-social')} />
         </View>
 
         {/* Seguridad: verificación de email + 2FA */}

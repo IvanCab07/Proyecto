@@ -12,6 +12,8 @@ export const LIMITES = {
   indicacion: 500,
   tituloEstudio: 100,
   descripcionEstudio: 190,
+  obraSocial: 50,
+  numeroAfiliado: 50,
 } as const;
 
 // Marcas diacríticas que deja `normalize('NFD')` al separar los acentos de la letra base.
@@ -90,5 +92,28 @@ export function validarDescripcionEstudio(valor: string): string | undefined {
   if (v.length > LIMITES.descripcionEstudio) {
     return `La descripción no puede superar los ${LIMITES.descripcionEstudio} caracteres`;
   }
+  return undefined;
+}
+
+// ── Obras sociales ──
+// Mismas reglas que obraSocialNombreSchema y el perfilSchema de backend/src: letras (con
+// acentos) separadas por un espacio o guion, de 3 a 50 caracteres. "Swiss Medical" y "OSDE" pasan.
+
+const RE_OBRA_SOCIAL = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:[ -][A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*$/;
+
+export function validarNombreObraSocial(valor: string): string | undefined {
+  const v = limpiar(valor);
+  if (!v) return 'El nombre es obligatorio';
+  if (v.length < 3) return 'El nombre debe tener al menos 3 caracteres';
+  if (v.length > LIMITES.obraSocial) return `El nombre no puede superar los ${LIMITES.obraSocial} caracteres`;
+  if (!RE_OBRA_SOCIAL.test(v)) return 'Solo puede tener letras, espacios y guiones';
+  return undefined;
+}
+
+/** El número de afiliado es opcional; si viene, máximo 50 caracteres. */
+export function validarNumeroAfiliado(valor: string): string | undefined {
+  const v = valor.trim();
+  if (!v) return undefined;
+  if (v.length > LIMITES.numeroAfiliado) return `El número no puede superar los ${LIMITES.numeroAfiliado} caracteres`;
   return undefined;
 }

@@ -79,6 +79,7 @@ export const IconHeart = makeF('heart');
 export const IconExternal = makeF('external-link');
 export const IconClipboard = makeF('clipboard');
 export const IconKey = makeF('key');
+export const IconCreditCard = makeF('credit-card');
 
 export const IconStar = makeM('star');
 export const IconStarOutline = makeM('star-outline');

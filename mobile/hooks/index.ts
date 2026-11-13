@@ -3,6 +3,7 @@ import {
   turnosService,
   medicosService,
   especialidadesService,
+  obrasSocialesService,
   estudiosService,
   recetasService,
   usersService,
@@ -156,6 +157,38 @@ export const useEliminarEspecialidad = () => {
   return useMutation({
     mutationFn: (id: string) => especialidadesService.eliminar(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['especialidades'] }),
+  });
+};
+
+// ── Obras sociales ──
+export const useObrasSociales = () =>
+  useQuery({
+    queryKey: ['obras-sociales'],
+    queryFn: obrasSocialesService.todas,
+  });
+
+export const useCrearObraSocial = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (nombre: string) => obrasSocialesService.crear(nombre),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['obras-sociales'] }),
+  });
+};
+
+/**
+ * Guarda la obra social del paciente logueado. Usa el mismo PATCH /auth/perfil que los datos
+ * personales; además refresca el listado para que el contador de afiliados del admin cuadre.
+ */
+export const useActualizarObraSocial = () => {
+  const qc = useQueryClient();
+  const loadUser = useAuthStore(s => s.loadUser);
+  return useMutation({
+    mutationFn: (data: Pick<ActualizarPerfilDTO, 'obraSocialId' | 'numeroAfiliado' | 'vencimientoObraSocial'>) =>
+      authService.actualizarPerfil(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['obras-sociales'] });
+      return loadUser();
+    },
   });
 };
 

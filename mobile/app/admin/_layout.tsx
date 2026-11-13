@@ -10,6 +10,7 @@ export default function AdminLayout() {
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="especialidades" />
+      <Stack.Screen name="obras-sociales" />
       <Stack.Screen name="calificaciones" />
       <Stack.Screen name="ajustes" />
     </Stack>

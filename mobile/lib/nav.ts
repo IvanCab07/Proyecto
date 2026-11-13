@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 import {
   IconGrid, IconCalendar, IconUsers, IconStethoscope, IconTag, IconChart, IconSettings,
   IconHome, IconPlus, IconPill, IconFolder, IconUser, IconShield, IconMapPin, IconStar,
+  IconCreditCard,
 } from '../components/ui';
 import type { IconProps } from '../components/ui/Icon';
 
@@ -38,6 +39,7 @@ export const adminNav: NavGroup[] = [
       { to: '/admin/usuarios',       label: 'Usuarios',       desc: 'Crear, editar y dar de baja', icon: IconShield },
       { to: '/admin/medicos',        label: 'Médicos',        desc: 'Plantel y disponibilidad',    icon: IconStethoscope },
       { to: '/admin/especialidades', label: 'Especialidades', desc: 'Catálogo médico',             icon: IconTag },
+      { to: '/admin/obras-sociales', label: 'Obras sociales', desc: 'Coberturas aceptadas',        icon: IconCreditCard },
     ],
   },
   {
@@ -95,6 +97,7 @@ export const pacienteNav: NavGroup[] = [
     label: 'Cuenta',
     items: [
       { to: '/patient/perfil', label: 'Perfil',   desc: 'Tus datos y seguridad',   icon: IconUser },
+      { to: '/patient/obra-social', label: 'Obra social', desc: 'Tu cobertura y credencial', icon: IconCreditCard },
     ],
   },
 ];

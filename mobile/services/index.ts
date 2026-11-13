@@ -14,6 +14,19 @@ export interface User {
   emailVerified: boolean;
   twoFactorEnabled: boolean;
   puedeCalificar?: boolean;
+  // ── Obra social (solo pacientes). null = atiende como particular ──
+  obraSocialId?: string | null;
+  obraSocial?: { id: string; nombre: string } | null;
+  numeroAfiliado?: string | null;
+  /** ISO. Hasta cuándo vale la credencial. */
+  vencimientoObraSocial?: string | null;
+}
+
+export interface ObraSocial {
+  id: string;
+  nombre: string;
+  /** Cantidad de pacientes afiliados (lo manda GET /obras-sociales). */
+  _count?: { pacientes: number };
 }
 
 export interface LoginDTO {
@@ -32,6 +45,10 @@ export interface ActualizarPerfilDTO {
   nombre?: string;
   apellido?: string;
   telefono?: string;
+  // null = sacar la obra social (pasar a particular). undefined = no tocar.
+  obraSocialId?: string | null;
+  numeroAfiliado?: string | null;
+  vencimientoObraSocial?: string | null;
 }
 
 export interface CambiarPasswordDTO {
@@ -451,6 +468,16 @@ export const especialidadesService = {
 
   eliminar: (id: string) =>
     api.delete(`/especialidades/${id}`),
+};
+
+// GET lo puede usar cualquier usuario logueado (el paciente elige de esta lista);
+// POST solo el admin (backend/src/routes/obrasSociales.routes.ts).
+export const obrasSocialesService = {
+  todas: () =>
+    api.get<ObraSocial[]>('/obras-sociales').then(r => r.data),
+
+  crear: (nombre: string) =>
+    api.post<ObraSocial>('/obras-sociales', { nombre }).then(r => r.data),
 };
 
 export type NotificationType =

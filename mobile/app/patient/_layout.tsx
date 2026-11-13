@@ -11,6 +11,7 @@ export default function PatientLayout() {
       <Stack.Screen name="estudios" />
       <Stack.Screen name="mapa" />
       <Stack.Screen name="perfil" />
+      <Stack.Screen name="obra-social" />
     </Stack>
   );
 }

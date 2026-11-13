@@ -8,8 +8,9 @@ import { useMisTurnos, useMisRecetas, useMisEstudios } from '../../../hooks';
 import {
   Card, StatCard, StatusBadge, Spinner,
   IconPlus, IconCalendar, IconClock, IconPill, IconFolder, IconCheckCircle,
-  IconArrowRight, IconChevronRight, IconStethoscope,
+  IconArrowRight, IconChevronRight, IconStethoscope, IconCreditCard,
 } from '../../../components/ui';
+import { estadoCobertura } from '../../../components/ObraSocialResumen';
 import { NotificationBell } from '../../../components/NotificationBell';
 import { ThemeToggle } from '../../../components/ThemeToggle';
 import { PressableScale, enterUp, stagger } from '../../../lib/motion';
@@ -58,6 +59,7 @@ export default function PacienteInicio() {
   const turnos = turnosQ.data;
   const recetas = recetasQ.data;
   const estudios = estudiosQ.data;
+  const estadoOS = estadoCobertura(user);
 
   const today = new Date().toISOString().slice(0, 10);
   const proximos = (turnos ?? [])
@@ -112,6 +114,26 @@ export default function PacienteInicio() {
             </PressableScale>
           </View>
         </View>
+
+        {/* Aviso de credencial: solo si la obra social venció o vence en los próximos días */}
+        {estadoOS === 'vencida' || estadoOS === 'por-vencer' ? (
+          <View className="px-4 pt-4">
+            <PressableScale
+              onPress={() => router.push('/patient/obra-social')}
+              haptic="select"
+              className={`flex-row items-center gap-3 rounded-card px-4 py-3.5 border ${estadoOS === 'vencida' ? 'bg-danger-soft border-danger/20' : 'bg-warning-soft border-warning/20'}`}
+            >
+              <IconCreditCard size={18} color={estadoOS === 'vencida' ? colors.danger.text : colors.warning.text} />
+              <View className="flex-1">
+                <Text className={`text-[14px] font-bold ${estadoOS === 'vencida' ? 'text-danger-text' : 'text-warning-text'}`}>
+                  {estadoOS === 'vencida' ? 'Tu credencial venció' : 'Tu credencial está por vencer'}
+                </Text>
+                <Text className="text-[12px] text-slate-500 mt-0.5">{user?.obraSocial?.nombre} · Tocá para actualizarla</Text>
+              </View>
+              <IconChevronRight size={16} color={colors.slate[400]} />
+            </PressableScale>
+          </View>
+        ) : null}
 
         {/* Próximo turno — primero: es el dato que el paciente viene a buscar. Antes arrancaba
             con cuatro contadores y había que scrollear para ver cuándo era el turno. */}
