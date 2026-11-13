@@ -477,3 +477,68 @@ export const notificationsService = {
   markAllRead: () =>
     api.patch<{ message: string }>('/notifications/read-all').then(r => r.data),
 };
+
+export type TipoRecordatorio = 'MEDICAMENTO' | 'TRATAMIENTO';
+export type EstadoToma = 'PENDIENTE' | 'TOMADO' | 'OMITIDO' | 'POSPUESTO';
+
+export interface RecordatorioSalud {
+  id: string;
+  pacienteId: string;
+  recetaId?: string | null;
+  titulo: string;
+  tipo: TipoRecordatorio;
+  dosis?: string | null;
+  instrucciones?: string | null;
+  horarios: string[];
+  fechaInicio: string;
+  fechaFin?: string | null;
+  diasSemana?: number[] | null;
+  activo: boolean;
+  createdAt: string;
+  updatedAt: string;
+  receta?: {
+    medicamento: string;
+    medico?: {
+      nombre: string;
+      apellido: string;
+    };
+  } | null;
+}
+
+export interface TomaTimeline {
+  id: string;
+  recordatorioId: string;
+  titulo: string;
+  tipo: TipoRecordatorio;
+  dosis: string | null;
+  instrucciones: string | null;
+  hora: string;
+  fechaProgramada: string;
+  estado: EstadoToma;
+  fechaRealizada: string | null;
+  registroTomaId?: string;
+}
+
+export interface MarcarTomaDTO {
+  fechaProgramada: string;
+  estado: EstadoToma;
+  notas?: string;
+}
+
+export interface ActualizarHorariosDTO {
+  horarios: string[];
+}
+
+export const recordatoriosService = {
+  misRecordatorios: () =>
+    api.get<RecordatorioSalud[]>('/recordatorios').then(r => r.data),
+  tomasHoy: () =>
+    api.get<TomaTimeline[]>('/recordatorios/hoy').then(r => r.data),
+  actualizarHorarios: (id: string, data: ActualizarHorariosDTO) =>
+    api.patch<RecordatorioSalud>(`/recordatorios/${id}/horarios`, data).then(r => r.data),
+  marcarToma: (recordatorioId: string, data: MarcarTomaDTO) =>
+    api.post(`/recordatorios/${recordatorioId}/tomas`, data).then(r => r.data),
+  toggleActivo: (id: string) =>
+    api.patch<RecordatorioSalud>(`/recordatorios/${id}/activo`).then(r => r.data),
+};
+

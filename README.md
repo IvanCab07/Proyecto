@@ -9,7 +9,7 @@ Hay **tres tipos de cuenta**: **Paciente**, **Médico** y **Administrador**.
 
 - **Backend:** Node.js + Express + TypeScript + Prisma (MySQL) · auth con JWT
 - **Web:** Vite + React + TypeScript + Tailwind
-- **Mobile:** React Native + Expo (SDK 54) + NativeWind
+- **Mobile:** React Native + Expo (SDK 57) + NativeWind
 - **Estado/datos:** Zustand + TanStack Query
 
 ## Requisitos

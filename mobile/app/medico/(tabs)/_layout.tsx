@@ -1,3 +1,4 @@
+import type { MaterialTopTabBarProps } from "expo-router/js-top-tabs";
 import { MaterialTopTabs } from '../../../components/MaterialTopTabs';
 import { RoleTabBar, type TabDef } from '../../../components/RoleTabBar';
 import { IconHome, IconCalendar, IconUsers, IconPill, IconList } from '../../../components/ui';
@@ -14,7 +15,7 @@ const TABS: TabDef[] = [
 export default function MedicoTabsLayout() {
   return (
     <MaterialTopTabs
-      tabBar={(props) => <RoleTabBar {...props} tabs={TABS} />}
+      tabBar={(props: MaterialTopTabBarProps) => <RoleTabBar {...props} tabs={TABS} />}
       tabBarPosition="bottom"
       screenOptions={{ swipeEnabled: true }}
     >

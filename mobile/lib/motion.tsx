@@ -103,7 +103,10 @@ export function PressableScale({
       onPress={(e) => { if (kind && !disabled) haptic[kind](); onPress?.(e); }}
       {...rest}
     >
-      <Animated.View style={[aStyle, fill ? { flex: 1 } : null, style]} className={className}>
+      {/* Sin flex:1 acá: el Pressable tiene alto automático y flexBasis 0 colapsaría el contenido
+          a solo el padding (el texto quedaba fuera del recuadro). El Pressable ya se estira en
+          la fila y el Animated.View se ensancha solo (alignItems: stretch). */}
+      <Animated.View style={[aStyle, style]} className={className}>
         {children}
       </Animated.View>
     </Pressable>

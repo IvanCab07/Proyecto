@@ -80,6 +80,8 @@ model User {
   turnos       Turno[]
   estudios     Estudio[]
   recetas      Receta[]
+  recordatoriosSalud RecordatorioSalud[]
+  registrosTomas     RegistroToma[]
 
   // Estudios que este usuario subió (los propios, o los que un médico cargó para un paciente)
   estudiosSubidos Estudio[] @relation("EstudiosSubidos")
@@ -265,6 +267,67 @@ model Receta {
 
   paciente     User     @relation(fields: [pacienteId], references: [id])
   medico       Medico   @relation(fields: [medicoId], references: [id])
+  recordatorios RecordatorioSalud[]
 
   @@map("recetas")
+}
+
+// ── TABLA: recordatorios_salud ──────────────────────────────
+// Agenda personal del paciente para medicamentos y tratamientos.
+enum TipoRecordatorio {
+  MEDICAMENTO
+  TRATAMIENTO
+}
+
+enum EstadoToma {
+  PENDIENTE
+  TOMADO
+  OMITIDO
+  POSPUESTO
+}
+
+model RecordatorioSalud {
+  id             String            @id @default(uuid())
+  pacienteId     String
+  paciente       User              @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  recetaId       String?
+  receta         Receta?           @relation(fields: [recetaId], references: [id], onDelete: SetNull)
+
+  titulo         String            // Ej: "Amoxicilina 500mg"
+  tipo           TipoRecordatorio  @default(MEDICAMENTO)
+  dosis          String?           // Ej: "1 comprimido cada 8hs"
+  instrucciones  String?           @db.Text
+  horarios       Json              // Lista de horas del día: ["08:00", "16:00", "00:00"]
+  fechaInicio    DateTime          @default(now())
+  fechaFin       DateTime?         // Null = indefinido o prolongado
+  diasSemana     Json?             // [1,2,3,4,5,6,7] o null si es diario
+  activo         Boolean           @default(true)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  tomas          RegistroToma[]
+
+  @@index([pacienteId, activo])
+  @@map("recordatorios_salud")
+}
+
+// ── TABLA: registros_tomas ──────────────────────────────────
+// Historial de cumplimiento de cada toma diaria.
+model RegistroToma {
+  id               String            @id @default(uuid())
+  recordatorioId   String
+  recordatorio     RecordatorioSalud @relation(fields: [recordatorioId], references: [id], onDelete: Cascade)
+  pacienteId       String
+  paciente         User              @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+
+  fechaProgramada  DateTime          // Fecha y hora programada de la toma
+  fechaRealizada   DateTime?         // Cuándo lo marcó el usuario
+  estado           EstadoToma        @default(PENDIENTE)
+  notas            String?
+
+  createdAt        DateTime          @default(now())
+
+  @@index([pacienteId, fechaProgramada])
+  @@index([recordatorioId, fechaProgramada])
+  @@map("registros_tomas")
 }

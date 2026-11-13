@@ -5,6 +5,7 @@ import { HttpError, formatZodError } from '../lib/httpError';
 import { fechaDeEntrada, finDeHoy, sumarDias } from '../lib/fechas';
 import { assertPacienteDelMedico, fichaDelMedico } from '../lib/medicoPaciente';
 import { notify } from '../services/notifications.service';
+import { inferirHorariosPorDefecto } from './recordatorios.controller';
 
 /**
  * Validez por defecto cuando el emisor no manda `validoHasta`.
@@ -97,6 +98,27 @@ export const crearReceta = async (req: Request, res: Response) => {
   await notify(pacienteId, 'RECETA_NUEVA', 'Nueva receta disponible',
     `El Dr. ${receta.medico.apellido} te emitió una receta: ${medicamento}.`,
     { email: true, link: '/paciente/recetas', data: { recetaId: receta.id } });
+
+  // Crear recordatorio automático en la agenda personal de salud del paciente
+  try {
+    const horariosPorDefecto = inferirHorariosPorDefecto(dosis);
+    await prisma.recordatorioSalud.create({
+      data: {
+        pacienteId,
+        recetaId: receta.id,
+        titulo: medicamento,
+        tipo: 'MEDICAMENTO',
+        dosis,
+        instrucciones: indicacion,
+        horarios: horariosPorDefecto,
+        fechaInicio: new Date(),
+        fechaFin: receta.validoHasta,
+        activo: true,
+      },
+    });
+  } catch (err) {
+    console.error('Error al autogenerar recordatorio en agenda:', err);
+  }
 
   return res.status(201).json(receta);
 };

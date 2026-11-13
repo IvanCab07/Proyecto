@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 import {
   IconGrid, IconCalendar, IconUsers, IconStethoscope, IconTag, IconChart, IconSettings,
   IconHome, IconPlus, IconPill, IconFolder, IconUser, IconShield, IconMapPin, IconStar,
+  IconClock,
 } from '../components/ui';
 import type { IconProps } from '../components/ui/Icon';
 
@@ -74,14 +75,13 @@ export const pacienteNav: NavGroup[] = [
     label: 'Mi salud',
     items: [
       { to: '/patient/inicio',    label: 'Inicio',          desc: 'Tu resumen',            icon: IconHome },
-      { to: '/patient/turnos',    label: 'Mis turnos',      desc: 'Próximos e historial',  icon: IconCalendar },
+      { to: '/patient/agenda',    label: 'Mi agenda',       desc: 'Tomas, turnos y recetas', icon: IconClock },
       { to: '/patient/solicitar', label: 'Solicitar turno', desc: 'Reservá con un médico', icon: IconPlus },
     ],
   },
   {
     label: 'Documentos',
     items: [
-      { to: '/patient/recetas',  label: 'Recetas',  desc: 'Tus indicaciones', icon: IconPill },
       { to: '/patient/estudios', label: 'Estudios', desc: 'Subí y consultá',  icon: IconFolder },
     ],
   },

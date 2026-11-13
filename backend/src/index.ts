@@ -22,6 +22,7 @@ import usersRoutes from './routes/users.routes';
 import especialidadesRoutes from './routes/especialidades.routes';
 import notificationsRoutes from './routes/notifications.routes';
 import calificacionesRoutes from './routes/calificaciones.routes';
+import recordatoriosRoutes from './routes/recordatorios.routes';
 
 const app = express();
 
@@ -46,6 +47,7 @@ app.use('/api/users',          usersRoutes);
 app.use('/api/especialidades', especialidadesRoutes);
 app.use('/api/notifications',  notificationsRoutes);
 app.use('/api/calificaciones', calificacionesRoutes);
+app.use('/api/recordatorios',   recordatoriosRoutes);
 
 // Error handler global: traduce cualquier error a { error: <string> } con un status claro.
 // Así un fallo de validación o un dato duplicado NUNCA llega al front como objeto o como 500 genérico.

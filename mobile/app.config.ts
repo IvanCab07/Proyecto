@@ -19,11 +19,6 @@ const config: ExpoConfig = {
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
   icon: './assets/icon.png',
-  splash: {
-    image: './assets/splash-icon.png',
-    resizeMode: 'contain',
-    backgroundColor: RAIL,
-  },
   ios: {
     bundleIdentifier: 'com.escuela.hospitalapp',
     ...(mapsKey ? { config: { googleMapsApiKey: mapsKey } } : {}),
@@ -44,7 +39,12 @@ const config: ExpoConfig = {
   plugins: [
     'expo-router',
     'expo-secure-store',
-    'expo-splash-screen',
+    ['expo-splash-screen', {
+      image: './assets/splash-icon.png',
+      resizeMode: 'contain',
+      backgroundColor: RAIL,
+    }],
+    'expo-status-bar',
     // Aplica userInterfaceStyle: 'automatic' del lado nativo; sin este paquete prebuild avisa
     // que la opción se ignora.
     'expo-system-ui',
@@ -56,6 +56,15 @@ const config: ExpoConfig = {
     }],
     // Reemplaza los colores nativos azules de la plantilla de Expo por los de la marca.
     ['./plugins/withColoresMarca', { primary: RAIL, primaryDark: RAIL_SOFT }],
+    // Android pinta el ícono chico de la barra de estado solo con el canal alfa, así que tiene que
+    // ser una silueta blanca sobre transparente (assets/notification-icon.png, la cruz con el
+    // pulso). Con el ícono de la app, que es un cuadrado opaco, salía un cuadrado blanco liso.
+    // El logo a color va como ícono grande, a la derecha de la notificación.
+    ['expo-notifications', {
+      icon: './assets/notification-icon.png',
+      largeIcon: './assets/icon.png',
+      color: RAIL,
+    }],
   ],
 };
 
