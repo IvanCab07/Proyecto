@@ -1,8 +1,6 @@
-import { withLayoutContext } from 'expo-router';
-import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { TopTabs } from 'expo-router/js-top-tabs';
 
 // Navegador de pestañas con deslizamiento (swipe) expuesto a expo-router.
 // Se usa con la barra inferior custom (tabBarPosition="bottom").
-const { Navigator } = createMaterialTopTabNavigator();
-
-export const MaterialTopTabs = withLayoutContext(Navigator);
+// SDK 58: createMaterialTopTabNavigator fue reemplazado por TopTabs directo.
+export const MaterialTopTabs = TopTabs;

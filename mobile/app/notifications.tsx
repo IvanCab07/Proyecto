@@ -94,7 +94,7 @@ export default function NotificationsScreen() {
           keyExtractor={n => n.id}
           contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40, flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.brand[500]} />}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { void refetch(); }} tintColor={colors.brand[500]} />}
           ListEmptyComponent={
             <EmptyState
               className="pt-10"

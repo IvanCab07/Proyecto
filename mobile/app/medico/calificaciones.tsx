@@ -44,7 +44,7 @@ export default function MedicoCalificacionesScreen() {
           keyExtractor={c => c.id}
           contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40, flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.brand[500]} />}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { void refetch(); }} tintColor={colors.brand[500]} />}
           ListEmptyComponent={
             filtro ? (
               <EmptyState
@@ -108,7 +108,7 @@ export default function MedicoCalificacionesScreen() {
                   {filtro ? `Reseñas de ${filtro} ${filtro === 1 ? 'estrella' : 'estrellas'} · ${visibles.length}` : `Todas las reseñas · ${cantidad}`}
                 </Text>
               </View>
-            ) : null
+            ) : undefined
           }
           renderItem={({ item, index }) => <ResenaCard item={item} index={index} />}
         />

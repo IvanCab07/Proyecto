@@ -85,7 +85,7 @@ export default function CalificacionesScreen() {
           contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40, flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.brand[500]} />}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { void refetch(); }} tintColor={colors.brand[500]} />}
           ListEmptyComponent={
             hayFiltros ? (
               <EmptyState
@@ -181,7 +181,7 @@ export default function CalificacionesScreen() {
                   {hayFiltros ? `Resultados · ${visibles.length}` : `Todas las reseñas · ${total}`}
                 </Text>
               </View>
-            ) : null
+            ) : undefined
           }
           renderItem={({ item, index }) => <ResenaCard item={item} index={index} />}
         />

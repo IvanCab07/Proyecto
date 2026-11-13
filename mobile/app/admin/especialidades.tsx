@@ -65,7 +65,7 @@ export default function EspecialidadesScreen() {
           keyExtractor={e => e.id}
           contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 110, flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.brand[500]} />}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { void refetch(); }} tintColor={colors.brand[500]} />}
           ListEmptyComponent={<EmptyState className="pt-12" icon={<IconTag size={28} color={colors.brand[500]} />} title="Sin especialidades" message="Agregá la primera especialidad médica." />}
           renderItem={({ item, index }) => {
             const medicosCount = (item as any)._count?.medicos ?? 0;

@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
 import { useAuthStore } from '../../../hooks/useAuthStore';
-import { useMisTurnos, useMisRecetas, useMisEstudios } from '../../../hooks';
+import { useMisTurnos, useMisRecetas, useMisEstudios, useTomasHoy } from '../../../hooks';
 import {
   Card, StatCard, StatusBadge, Spinner,
   IconPlus, IconCalendar, IconClock, IconPill, IconFolder, IconCheckCircle,
@@ -19,6 +19,61 @@ import { useTheme } from '../../../lib/useTheme';
 import { accesosFor } from '../../../lib/nav';
 import { formatFecha, formatFechaLarga, saludo, MESES } from '../../../lib/format';
 import type { Turno } from '../../../services';
+
+function AgendaShortcutCard({ onPress }: { onPress: () => void }) {
+  const { colors, shadow } = useTheme();
+  const { data: tomas = [] } = useTomasHoy();
+
+  const tomasCompletadas = tomas.filter(t => t.estado === 'TOMADO').length;
+  const proximaPendiente = tomas.find(t => t.estado === 'PENDIENTE' || t.estado === 'POSPUESTO');
+
+  return (
+    <PressableScale
+      onPress={onPress}
+      haptic="select"
+      scaleTo={0.985}
+      style={shadow.card}
+      className="bg-surface rounded-card border border-emerald-100 overflow-hidden"
+    >
+      <View className="p-4 flex-row items-center justify-between">
+        <View className="flex-row items-center gap-3.5 flex-1 mr-2">
+          <View className="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-100 items-center justify-center">
+            <IconClock size={20} color={colors.brand[600]} />
+          </View>
+          <View className="flex-1">
+            <View className="flex-row items-center gap-2">
+              <Text className="text-[11px] font-bold text-brand-700 uppercase tracking-wider">
+                Mi Agenda de Salud
+              </Text>
+              {tomas.length > 0 && (
+                <View className="bg-emerald-100 px-2 py-0.5 rounded-full">
+                  <Text className="text-[10px] font-bold text-emerald-800">
+                    {tomasCompletadas}/{tomas.length} tomas
+                  </Text>
+                </View>
+              )}
+            </View>
+            <Text className="text-base font-bold text-slate-900 mt-0.5" numberOfLines={1}>
+              {proximaPendiente
+                ? `Próxima: ${proximaPendiente.titulo}`
+                : tomas.length > 0 && tomasCompletadas === tomas.length
+                ? '¡Todas las tomas al día!'
+                : 'Medicamentos y tratamientos'}
+            </Text>
+            <Text className="text-xs text-slate-500 mt-0.5">
+              {proximaPendiente
+                ? `A las ${proximaPendiente.hora} hs · Tocá para ver o marcar`
+                : 'Revisá tus horarios y tomas del día'}
+            </Text>
+          </View>
+        </View>
+        <View className="w-7 h-7 rounded-full bg-slate-100 items-center justify-center">
+          <IconChevronRight size={14} color={colors.slate[600]} />
+        </View>
+      </View>
+    </PressableScale>
+  );
+}
 
 function NextTurnoCard({ t, onPress }: { t: Turno; onPress: () => void }) {
   const { colors, shadow } = useTheme();
@@ -47,6 +102,7 @@ function NextTurnoCard({ t, onPress }: { t: Turno; onPress: () => void }) {
   );
 }
 
+
 export default function PacienteInicio() {
   const { colors, shadow } = useTheme();
   const user = useAuthStore(s => s.user);
@@ -55,6 +111,7 @@ export default function PacienteInicio() {
   const turnosQ = useMisTurnos();
   const recetasQ = useMisRecetas();
   const estudiosQ = useMisEstudios();
+  const tomasQ = useTomasHoy();
 
   const turnos = turnosQ.data;
   const recetas = recetasQ.data;
@@ -82,7 +139,12 @@ export default function PacienteInicio() {
   const ultimasRecetas = (recetas ?? []).slice(0, 3);
   const ultimosEstudios = (estudios ?? []).slice(0, 3);
 
-  const onRefresh = () => { turnosQ.refetch(); recetasQ.refetch(); estudiosQ.refetch(); };
+  const onRefresh = () => {
+    turnosQ.refetch();
+    recetasQ.refetch();
+    estudiosQ.refetch();
+    tomasQ.refetch();
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.canvas }}>
@@ -135,9 +197,15 @@ export default function PacienteInicio() {
           </View>
         ) : null}
 
+        {/* Acceso destacado: Mi Agenda de Salud */}
+        <Animated.View entering={enterUp(60)} className="px-4 pt-4">
+          <AgendaShortcutCard onPress={() => router.push('/patient/agenda')} />
+        </Animated.View>
+
         {/* Próximo turno — primero: es el dato que el paciente viene a buscar. Antes arrancaba
             con cuatro contadores y había que scrollear para ver cuándo era el turno. */}
         <Animated.View entering={enterUp(80)} className="px-4 pt-4">
+
           <View className="flex-row items-center justify-between mb-2.5">
             <Text className="text-sm font-bold text-slate-900">Próximo turno</Text>
             <PressableScale onPress={() => router.push('/patient/turnos')} haptic={false} className="flex-row items-center gap-1">

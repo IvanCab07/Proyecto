@@ -84,7 +84,7 @@ export default function EstudiosScreen() {
           keyExtractor={e => e.id}
           contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 110, flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.brand[500]} />}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { void refetch(); }} tintColor={colors.brand[500]} />}
           ListEmptyComponent={
             <EmptyState
               className="pt-10"

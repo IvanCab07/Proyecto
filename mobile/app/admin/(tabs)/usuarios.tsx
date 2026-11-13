@@ -188,7 +188,7 @@ export default function UsuariosScreen() {
           keyExtractor={c => c.id}
           contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 110, flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.brand[500]} />}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { void refetch(); }} tintColor={colors.brand[500]} />}
           ListEmptyComponent={
             <EmptyState
               className="pt-12"
@@ -197,7 +197,7 @@ export default function UsuariosScreen() {
               message={busqueda ? `Ninguna cuenta coincide con "${busqueda}".` : 'Creá la primera cuenta con "Nuevo usuario".'}
             />
           }
-          ListHeaderComponent={count > 0 ? <Text className="text-[12px] text-slate-400 font-medium mb-1 px-1">{count} cuenta{count !== 1 ? 's' : ''}</Text> : null}
+          ListHeaderComponent={count > 0 ? <Text className="text-[12px] text-slate-400 font-medium mb-1 px-1">{count} cuenta{count !== 1 ? 's' : ''}</Text> : undefined}
           renderItem={({ item, index }) => (
             <Animated.View entering={stagger(index)}>
               <Card className="p-3.5 flex-row items-center">

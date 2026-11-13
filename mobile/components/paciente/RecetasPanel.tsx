@@ -1,27 +1,23 @@
 import { View, Text, FlatList, RefreshControl } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { useMisRecetas } from '../../../hooks';
+import { useMisRecetas } from '../../hooks';
 import {
-  Card, Avatar, ScreenHeader, EmptyState, Skeleton,
+  Card, Avatar, EmptyState, Skeleton,
   IconPill,
-} from '../../../components/ui';
-import { stagger } from '../../../lib/motion';
-import { useTheme } from '../../../lib/useTheme';
-import { formatFecha } from '../../../lib/format';
-import type { Receta } from '../../../services';
+} from '../ui';
+import { stagger } from '../../lib/motion';
+import { useTheme } from '../../lib/useTheme';
+import { formatFecha } from '../../lib/format';
+import type { Receta } from '../../services';
 
-export default function RecetasScreen() {
+// Listado de recetas del paciente. Lo usan la pestaña «Recetas» y la pantalla «Mi agenda»; el
+// encabezado lo pone cada una.
+export function RecetasPanel({ paddingBottom = 110 }: { paddingBottom?: number }) {
   const { colors } = useTheme();
   const { data: recetas, isLoading, isRefetching, refetch } = useMisRecetas();
-  const count = recetas?.length ?? 0;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.canvas }}>
-      <ScreenHeader
-        eyebrow="Mis recetas"
-        title="Medicamentos"
-        subtitle={`${count} receta${count !== 1 ? 's' : ''} emitida${count !== 1 ? 's' : ''}`}
-      />
+    <View style={{ flex: 1 }}>
       {isLoading ? (
         <View className="p-4 gap-3">
           {[0, 1, 2].map(i => <Skeleton key={i} className="h-32 rounded-card" />)}
@@ -30,9 +26,9 @@ export default function RecetasScreen() {
         <FlatList
           data={recetas}
           keyExtractor={r => r.id}
-          contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 110, flexGrow: 1 }}
+          contentContainerStyle={{ padding: 16, gap: 12, paddingBottom, flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.brand[500]} />}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { void refetch(); }} tintColor={colors.brand[500]} />}
           ListEmptyComponent={
             <EmptyState
               className="pt-16"

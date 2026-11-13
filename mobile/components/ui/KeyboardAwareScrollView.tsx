@@ -2,14 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ScrollView, KeyboardAvoidingView, Keyboard, Platform, TextInput, Dimensions,
 } from 'react-native';
-import type { ScrollViewProps } from 'react-native';
+import type { ScrollViewProps, ScrollViewInstance } from 'react-native';
 
 // ScrollView que mantiene el TextInput enfocado visible sobre el teclado.
 // iOS: lo resuelve KeyboardAvoidingView (behavior padding). Android: en Expo Go no se
 // respeta el windowSoftInputMode del manifest, así que escuchamos el teclado y scrolleamos
 // el input enfocado por JS. Sin módulos nativos → funciona en Expo Go.
 export function KeyboardAwareScrollView({ children, contentContainerStyle, ...props }: ScrollViewProps) {
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const offsetY = useRef(0);                 // offset actual del scroll (para sumarle el solape)
   const [kbHeight, setKbHeight] = useState(0);
 

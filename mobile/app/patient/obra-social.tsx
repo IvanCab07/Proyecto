@@ -91,7 +91,7 @@ export default function ObraSocialScreen() {
       <KeyboardAwareScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 110, gap: 14 }}
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.brand[500]} />}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { void refetch(); }} tintColor={colors.brand[500]} />}
       >
         <ObraSocialResumen user={user} />
 

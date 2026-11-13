@@ -1,7 +1,7 @@
 import { forwardRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { View, Text, TextInput, Pressable } from 'react-native';
-import type { TextInputProps } from 'react-native';
+import type { TextInputProps, TextInputInstance } from 'react-native';
 import { cn } from '../../lib/cn';
 import type { Palette } from '../../lib/theme';
 import { useTheme } from '../../lib/useTheme';
@@ -40,7 +40,7 @@ type InputProps = TextInputProps & {
   label?: string; hint?: string; error?: string; required?: boolean; className?: string; iconLeft?: ReactNode;
 };
 
-export const Input = forwardRef<TextInput, InputProps>(function Input(
+export const Input = forwardRef<TextInputInstance, InputProps>(function Input(
   { label, hint, error, required, className, iconLeft, onFocus, onBlur, ...rest }, ref,
 ) {
   const { colors } = useTheme();
@@ -62,7 +62,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
   );
 });
 
-export const PasswordInput = forwardRef<TextInput, InputProps>(function PasswordInput(
+export const PasswordInput = forwardRef<TextInputInstance, InputProps>(function PasswordInput(
   { label, hint, error, required, className, iconLeft, onFocus, onBlur, ...rest }, ref,
 ) {
   const { colors } = useTheme();
@@ -89,7 +89,7 @@ export const PasswordInput = forwardRef<TextInput, InputProps>(function Password
   );
 });
 
-export const Textarea = forwardRef<TextInput, InputProps>(function Textarea(
+export const Textarea = forwardRef<TextInputInstance, InputProps>(function Textarea(
   { label, hint, error, required, className, onFocus, onBlur, style, ...rest }, ref,
 ) {
   const { colors } = useTheme();

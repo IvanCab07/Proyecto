@@ -201,7 +201,7 @@ function Panel({ onCerrar }: { onCerrar: () => void }) {
               <Burbuja mensaje={item} onAccion={irA} onSugerencia={elegirTema} />
             )}
             ListFooterComponent={
-              soloSaludo ? <Atajos onElegir={elegirTema} /> : null
+              soloSaludo ? <Atajos onElegir={elegirTema} /> : undefined
             }
           />
 

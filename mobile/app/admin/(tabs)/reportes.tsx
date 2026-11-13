@@ -92,7 +92,7 @@ export default function ReportesScreen() {
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.brand[500]} />}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { void refetch(); }} tintColor={colors.brand[500]} />}
       >
         {isLoading ? (
           <View className="gap-3">{[0, 1, 2, 3].map(i => <Skeleton key={i} className="h-24 rounded-card" />)}</View>

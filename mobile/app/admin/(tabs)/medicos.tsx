@@ -72,7 +72,7 @@ export default function MedicosAdminScreen() {
           keyExtractor={m => m.id}
           contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 110, flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.brand[500]} />}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { void refetch(); }} tintColor={colors.brand[500]} />}
           ListEmptyComponent={<EmptyState className="pt-12" icon={<IconStethoscope size={28} color={colors.brand[500]} />} title="Sin médicos" message="Agregá el primer médico al sistema." />}
           renderItem={({ item, index }) => (
             <Animated.View entering={stagger(index)}>

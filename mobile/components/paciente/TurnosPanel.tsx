@@ -2,23 +2,26 @@ import { useState, useMemo } from 'react';
 import { View, Text, SectionList, RefreshControl, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
-import { useMisTurnos, useCancelarTurno, useCrearCalificacion } from '../../../hooks';
-import { useAuthStore } from '../../../hooks/useAuthStore';
+import { useMisTurnos, useCancelarTurno, useCrearCalificacion } from '../../hooks';
+import { useAuthStore } from '../../hooks/useAuthStore';
 import {
-  Card, Calendario, StatusBadge, Stars, SegmentedTabs, Sheet, Button, Textarea, ScreenHeader, EmptyState, Skeleton, toast,
+  Card, Calendario, StatusBadge, Stars, SegmentedTabs, Sheet, Button, Textarea, EmptyState, Skeleton, toast,
   HoraTurno,
-  IconClock, IconCheckCircle, IconCalendar, IconX, IconRefresh, IconStar, IconChevronDown,
-} from '../../../components/ui';
-import type { MarcaDia } from '../../../components/ui';
-import { PressableScale, stagger } from '../../../lib/motion';
-import { useTheme } from '../../../lib/useTheme';
-import { apiError } from '../../../lib/apiError';
-import { claveFecha } from '../../../lib/fechas';
-import type { Turno } from '../../../services';
+  IconClock, IconCalendar, IconX, IconRefresh, IconStar, IconChevronDown,
+} from '../ui';
+import type { MarcaDia } from '../ui';
+import { PressableScale, stagger } from '../../lib/motion';
+import { useTheme } from '../../lib/useTheme';
+import { apiError } from '../../lib/apiError';
+import { claveFecha } from '../../lib/fechas';
+import type { Turno } from '../../services';
 
 type Tab = 'proximos' | 'historial';
 
-export default function TurnosScreen() {
+// Listado de turnos del paciente (próximos / historial, calendario, cancelar, reagendar y
+// calificar). Lo usan la pestaña «Turnos» y la pantalla «Mi agenda»; el encabezado lo pone
+// cada una.
+export function TurnosPanel({ paddingBottom = 110 }: { paddingBottom?: number }) {
   const { colors, STATUS } = useTheme();
   const { data: turnos, isLoading, isRefetching, refetch } = useMisTurnos();
   const cancelar = useCancelarTurno();
@@ -104,8 +107,6 @@ export default function TurnosScreen() {
     return [{ title: 'Historial', data: currentList }];
   }, [currentList, tab]);
 
-  const completados = historial.filter(t => t.status === 'COMPLETADO').length;
-
   // Turnos agrupados por día, con el color del estado. Así el calendario distingue un
   // cancelado de un confirmado en vez de pintar todo del mismo verde.
   const turnosPorFecha = useMemo(() => (turnos ?? []).reduce<Record<string, Turno[]>>((acc, t) => {
@@ -122,15 +123,7 @@ export default function TurnosScreen() {
   }, [turnosPorFecha, STATUS]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.canvas }}>
-      <ScreenHeader eyebrow="Bienvenido/a" title={`${user?.nombre ?? ''} ${user?.apellido ?? ''}`.trim() || 'Mis turnos'}>
-        <View className="flex-row gap-2.5">
-          <Pill icon={<IconClock size={14} color={colors.warning.DEFAULT} />} value={proximos.length} label="Próximos" />
-          <Pill icon={<IconCheckCircle size={14} color={colors.success.DEFAULT} />} value={completados} label="Completados" />
-          <Pill icon={<IconCalendar size={14} color={colors.brand[300]} />} value={turnos?.length ?? 0} label="Total" />
-        </View>
-      </ScreenHeader>
-
+    <View style={{ flex: 1 }}>
       <View className="px-4 py-3">
         <SegmentedTabs
           value={tab}
@@ -148,10 +141,10 @@ export default function TurnosScreen() {
         <SectionList
           sections={sections}
           keyExtractor={t => t.id}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 110, flexGrow: 1 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom, flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
           stickySectionHeadersEnabled={false}
-          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.brand[500]} />}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { void refetch(); }} tintColor={colors.brand[500]} />}
           ListHeaderComponent={
             // Va acá y no fuera de la lista: así scrollea junto con los turnos en vez de
             // ocupar alto fijo permanente.
@@ -190,7 +183,7 @@ export default function TurnosScreen() {
               className="pt-12"
               icon={<IconCalendar size={28} color={colors.brand[500]} />}
               title={tab === 'proximos' ? 'Sin turnos próximos' : 'Sin historial'}
-              message={tab === 'proximos' ? 'Solicitá un turno desde el botón central.' : 'Acá aparecerán tus turnos completados y cancelados.'}
+              message={tab === 'proximos' ? 'Solicitá uno desde Inicio.' : 'Acá aparecerán tus turnos completados y cancelados.'}
             />
           }
           renderSectionHeader={({ section }) => (
@@ -279,22 +272,6 @@ function Leyenda() {
           <Text className="text-[11px] text-slate-500">{label}</Text>
         </View>
       ))}
-    </View>
-  );
-}
-
-// Píldoras de resumen del encabezado.
-//
-// Iban en blanco sobre el hero verde de la versión anterior; desde que ScreenHeader es
-// bg-canvas (claro), ese blanco sobre blanco era invisible. Ahora siguen el mismo patrón que
-// StatCard: fondo brand-50 y texto de la rampa slate, que se invierte sola con el tema.
-function Pill({ icon, value, label }: { icon: React.ReactNode; value: number; label: string }) {
-  const { colors } = useTheme();
-  return (
-    <View className="flex-1 rounded-xl p-3 border border-slate-100" style={{ backgroundColor: colors.brand[50] }}>
-      {icon}
-      <Text className="text-slate-900 font-bold text-[22px] mt-1" style={{ fontVariant: ['tabular-nums'], letterSpacing: -0.5 }}>{value}</Text>
-      <Text className="text-slate-500 text-[11px] font-medium mt-0.5">{label}</Text>
     </View>
   );
 }

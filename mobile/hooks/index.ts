@@ -10,6 +10,7 @@ import {
   authService,
   notificationsService,
   calificacionesService,
+  recordatoriosService,
   CreateTurnoDTO,
   CreateMedicoDTO,
   CreateRecetaDTO,
@@ -18,6 +19,8 @@ import {
   CreateCalificacionDTO,
   ActualizarPerfilDTO,
   CambiarPasswordDTO,
+  MarcarTomaDTO,
+  ActualizarHorariosDTO,
 } from '../services';
 import { useAuthStore } from './useAuthStore';
 
@@ -430,5 +433,54 @@ export const useMarkAllNotifRead = () => {
   return useMutation({
     mutationFn: () => notificationsService.markAllRead(),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+};
+
+// ── Hooks para Agenda Personal de Salud y Recordatorios ───────
+export const useMisRecordatorios = () =>
+  useQuery({
+    queryKey: ['recordatorios'],
+    queryFn: recordatoriosService.misRecordatorios,
+  });
+
+export const useTomasHoy = () =>
+  useQuery({
+    queryKey: ['tomas-hoy'],
+    queryFn: recordatoriosService.tomasHoy,
+    refetchInterval: 30 * 1000, // Refresca cada 30 segundos para actualizar estado del día
+  });
+
+export const useActualizarHorarios = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, horarios }: { id: string; horarios: string[] }) =>
+      recordatoriosService.actualizarHorarios(id, { horarios }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['recordatorios'] });
+      qc.invalidateQueries({ queryKey: ['tomas-hoy'] });
+    },
+  });
+};
+
+export const useMarcarToma = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ recordatorioId, data }: { recordatorioId: string; data: MarcarTomaDTO }) =>
+      recordatoriosService.marcarToma(recordatorioId, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tomas-hoy'] });
+      qc.invalidateQueries({ queryKey: ['recordatorios'] });
+    },
+  });
+};
+
+export const useToggleActivoRecordatorio = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => recordatoriosService.toggleActivo(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['recordatorios'] });
+      qc.invalidateQueries({ queryKey: ['tomas-hoy'] });
+    },
   });
 };

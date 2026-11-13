@@ -3,17 +3,10 @@ import { prisma } from '../lib/prisma';
 import { sendMail, notificationEmailTemplate } from '../lib/mailer';
 import { WEB_URL } from '../config/env';
 
-// ────────────────────────────────────────────────────────────────
-// Servicio de notificaciones. `notify` crea la notificación in-app
-// (await rápido: un insert) y, si se pide email, lo manda en segundo
-// plano para no demorar la respuesta de la API. Nunca lanza: un fallo
-// de notificación no debe romper la acción que la disparó.
-// ────────────────────────────────────────────────────────────────
-
 interface NotifyOptions {
   data?: Record<string, unknown>;  // contexto extra: { turnoId?, recetaId? }
   link?: string;                   // ruta relativa para el CTA (ej '/paciente/turnos')
-  email?: boolean;                 // si true, además envía un email
+  email?: boolean;                 
 }
 
 export async function notify(

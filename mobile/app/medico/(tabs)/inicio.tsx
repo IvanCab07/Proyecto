@@ -52,7 +52,7 @@ export default function MedicoInicio() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 110 }}
-        refreshControl={<RefreshControl refreshing={agendaQ.isRefetching} onRefresh={agendaQ.refetch} tintColor={colors.brand[500]} />}
+        refreshControl={<RefreshControl refreshing={agendaQ.isRefetching} onRefresh={() => { void agendaQ.refetch(); }} tintColor={colors.brand[500]} />}
       >
         {/* Saludo sobre el lienzo claro (mismo criterio que el inicio del paciente). */}
         <View className="px-5 pb-1" style={{ paddingTop: insets.top + 8 }}>

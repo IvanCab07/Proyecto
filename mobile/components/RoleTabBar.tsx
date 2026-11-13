@@ -2,7 +2,7 @@ import type { ComponentType } from 'react';
 import { View, Text, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { MaterialTopTabBarProps } from '@react-navigation/material-top-tabs';
+import type { MaterialTopTabBarProps } from "expo-router/js-top-tabs";
 import { PressableScale } from '../lib/motion';
 import { cn } from '../lib/cn';
 import { useTheme } from '../lib/useTheme';
@@ -33,7 +33,7 @@ export interface TabDef {
  */
 export const ALTO_TABBAR = 76;
 
-export function RoleTabBar({ state, navigation, tabs }: MaterialTopTabBarProps & { tabs: TabDef[] }) {
+export function RoleTabBar({ state, navigateToTab, tabs }: MaterialTopTabBarProps & { tabs: TabDef[] }) {
   const { colors, shadow } = useTheme();
   const insets = useSafeAreaInsets();
   const focusedName = state.routes[state.index]?.name;
@@ -41,9 +41,11 @@ export function RoleTabBar({ state, navigation, tabs }: MaterialTopTabBarProps &
   return (
     <View style={{ paddingBottom: Math.max(insets.bottom, Platform.OS === 'android' ? 12 : 6), paddingTop: 8, paddingHorizontal: 16 }}>
       <View className="flex-row items-center bg-surface rounded-[26px] px-2 py-2" style={shadow.pop}>
-        {tabs.map((tab) => {
+        {tabs.map((tab: TabDef) => {
           const focused = focusedName === tab.name;
-          const go = () => { if (focusedName !== tab.name) navigation.navigate(tab.name as never); };
+          // SDK 58: la barra ya no recibe `navigation`; se navega por la key de la ruta.
+          const route = state.routes.find((r) => r.name === tab.name);
+          const go = () => { if (route && focusedName !== tab.name) navigateToTab(route.key); };
 
           if (tab.isFab) {
             return (
