@@ -59,7 +59,10 @@ model User {
   fotoUrl      String?  @db.VarChar(255)         // Ruta de la foto de perfil ("/uploads/avatar-x.jpg"), null = iniciales
   role         Role     @default(PATIENT)       // Rol (por defecto es paciente)
   activo       Boolean  @default(true)          // Si la cuenta está habilitada para ingresar
-
+  obraSocialId          String?
+  obraSocial            ObraSocial? @relation(fields: [obraSocialId], references: [id])
+  numeroAfiliado        String?
+  vencimientoObraSocial DateTime?
   // ── Baja de la cuenta ──
   // Se completan cuando el admin la da de baja y se limpian al reactivarla.
   motivoBaja    String?                         // Por qué se dio de baja (lo escribe el admin)
@@ -154,7 +157,7 @@ model Especialidad {
   id       String    @id @default(uuid())
   nombre   String    @unique                    // Nombre de la especialidad (único)
   medicos  Medico[]                             // Médicos que pertenecen a esta especialidad
-
+  coberturas CoberturaEspecialidad[]
   @@map("especialidades")
 }
 
@@ -267,4 +270,25 @@ model Receta {
   medico       Medico   @relation(fields: [medicoId], references: [id])
 
   @@map("recetas")
+}
+
+model ObraSocial {
+  id       String    @id @default(uuid())
+  nombre   String    @unique
+  pacientes User[]
+  coberturas CoberturaEspecialidad[]
+
+  @@map("obras_sociales")
+}
+
+model CoberturaEspecialidad {
+  id             String       @id @default(uuid())
+  obraSocialId   String
+  especialidadId String
+  porcentajeCobertura Int?
+  obraSocial     ObraSocial   @relation(fields: [obraSocialId], references: [id])
+  especialidad   Especialidad @relation(fields: [especialidadId], references: [id])
+
+  @@unique([obraSocialId, especialidadId])
+  @@map("cobertura_especialidades")
 }

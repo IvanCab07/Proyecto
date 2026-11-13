@@ -19,6 +19,8 @@ const USER_PUBLIC = {
   id: true, email: true, nombre: true, apellido: true,
   dni: true, telefono: true, fotoUrl: true, role: true,
   emailVerified: true, twoFactorEnabled: true, puedeCalificar: true,
+  obraSocialId: true, numeroAfiliado: true, vencimientoObraSocial: true,
+  obraSocial: { select: { id: true, nombre: true } },
 } as const;
 
 const registerSchema = z.object({
@@ -130,6 +132,9 @@ const perfilSchema = z.object({
   nombre:   nombreSchema.optional(),
   apellido: nombreSchema.optional(),
   telefono: telefonoOpcionalSchema,
+  obraSocialId: z.string().uuid().nullable().optional(),
+  numeroAfiliado: z.string().trim().max(50).nullable().optional(),
+  vencimientoObraSocial: z.coerce.date().nullable().optional(),
 });
 
 const cambiarPasswordSchema = z.object({
