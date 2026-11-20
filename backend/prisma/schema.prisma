@@ -268,6 +268,15 @@ model Receta {
   validoHasta  DateTime
   createdAt    DateTime @default(now())
 
+  // ── Cobertura de la obra social ──
+  // Medicamento del catálogo (si el médico eligió uno; si lo escribió a mano queda null).
+  medicamentoId String?
+  medicamentoRef Medicamento? @relation(fields: [medicamentoId], references: [id], onDelete: SetNull)
+  // "Foto" de la cobertura al momento de emitir: si después cambia el porcentaje o el paciente
+  // cambia de obra social, la receta ya emitida conserva lo que valía ese día.
+  coberturaObraSocial String?                       // Nombre de la obra social que cubrió
+  coberturaPorcentaje Int?                          // 0-100. null = sin cobertura (particular, vencida o no cubre)
+
   paciente     User     @relation(fields: [pacienteId], references: [id])
   medico       Medico   @relation(fields: [medicoId], references: [id])
   recordatorios RecordatorioSalud[]
@@ -280,8 +289,36 @@ model ObraSocial {
   nombre   String    @unique
   pacientes User[]
   coberturas CoberturaEspecialidad[]
+  coberturasMedicamentos CoberturaMedicamento[]
 
   @@map("obras_sociales")
+}
+
+// ── TABLA: medicamentos ─────────────────────────────────────
+// Catálogo de medicamentos que arma el admin. El médico puede elegir uno al recetar
+// (y ahí se aplica la cobertura) o escribir uno libre (sin cobertura).
+model Medicamento {
+  id         String   @id @default(uuid())
+  nombre     String   @unique                       // Ej: "Paracetamol 500 mg"
+  createdAt  DateTime @default(now())
+  coberturas CoberturaMedicamento[]
+  recetas    Receta[]
+
+  @@map("medicamentos")
+}
+
+// ── TABLA: cobertura_medicamentos ───────────────────────────
+// Cuánto cubre cada obra social de cada medicamento. Ej: Swiss Medical cubre 20% del Paracetamol.
+model CoberturaMedicamento {
+  id            String      @id @default(uuid())
+  obraSocialId  String
+  medicamentoId String
+  porcentaje    Int                                 // 0 a 100
+  obraSocial    ObraSocial  @relation(fields: [obraSocialId], references: [id], onDelete: Cascade)
+  medicamento   Medicamento @relation(fields: [medicamentoId], references: [id], onDelete: Cascade)
+
+  @@unique([obraSocialId, medicamentoId])
+  @@map("cobertura_medicamentos")
 }
 
 model CoberturaEspecialidad {

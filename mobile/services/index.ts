@@ -197,12 +197,41 @@ export interface Receta {
     especialidad: { nombre: string };
   };
   paciente?: Pick<User, 'id' | 'nombre' | 'apellido' | 'dni'>;
+  /** Medicamento del catálogo (null si se escribió a mano). */
+  medicamentoId?: string | null;
+  /** Cobertura guardada al emitir. null = sin cobertura. */
+  coberturaObraSocial?: string | null;
+  coberturaPorcentaje?: number | null;
+}
+
+export interface Medicamento {
+  id: string;
+  nombre: string;
+  /** En cuántas obras sociales tiene cobertura cargada. */
+  _count?: { coberturas: number };
+}
+
+export interface CoberturaMedicamento {
+  id: string;
+  obraSocialId: string;
+  medicamentoId: string;
+  porcentaje: number;
+  medicamento: { id: string; nombre: string };
+}
+
+/** Lo que devuelve GET /recetas/cobertura (preview para el médico antes de emitir). */
+export interface CoberturaPreview {
+  obraSocial: string | null;
+  porcentaje: number | null;
+  motivo?: 'particular' | 'credencial-vencida' | 'sin-catalogo' | 'no-cubre';
 }
 
 export interface CreateRecetaDTO {
   pacienteId: string;
   medicoId?: string;
   medicamento: string;
+  /** Si viene, se aplica la cobertura de la obra social del paciente. */
+  medicamentoId?: string;
   dosis: string;
   indicacion: string;
   validoHasta?: string;
@@ -421,6 +450,18 @@ export const recetasService = {
   // El backend solo deja borrar las que emitió el propio médico (el admin, cualquiera)
   eliminar: (id: string) =>
     api.delete<{ message: string }>(`/recetas/${id}`).then(r => r.data),
+
+  // Cuánto le cubre la obra social del paciente ese medicamento (antes de emitir)
+  coberturaPreview: (pacienteId: string, medicamentoId?: string) =>
+    api.get<CoberturaPreview>('/recetas/cobertura', { params: { pacienteId, medicamentoId } }).then(r => r.data),
+};
+
+export const medicamentosService = {
+  todos: () =>
+    api.get<Medicamento[]>('/medicamentos').then(r => r.data),
+
+  crear: (nombre: string) =>
+    api.post<Medicamento>('/medicamentos', { nombre }).then(r => r.data),
 };
 
 export const usersService = {
@@ -478,6 +519,16 @@ export const obrasSocialesService = {
 
   crear: (nombre: string) =>
     api.post<ObraSocial>('/obras-sociales', { nombre }).then(r => r.data),
+
+  coberturas: (id: string) =>
+    api.get<CoberturaMedicamento[]>(`/obras-sociales/${id}/coberturas`).then(r => r.data),
+
+  // Crea o actualiza el porcentaje (upsert en el backend)
+  guardarCobertura: (id: string, medicamentoId: string, porcentaje: number) =>
+    api.put<CoberturaMedicamento>(`/obras-sociales/${id}/coberturas/${medicamentoId}`, { porcentaje }).then(r => r.data),
+
+  eliminarCobertura: (id: string, medicamentoId: string) =>
+    api.delete<{ message: string }>(`/obras-sociales/${id}/coberturas/${medicamentoId}`).then(r => r.data),
 };
 
 export type NotificationType =

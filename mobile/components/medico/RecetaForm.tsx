@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View, Text } from 'react-native';
 import {
   Button, Input, Textarea, Chip, Sheet, Calendario,
@@ -7,7 +7,8 @@ import {
 import { PressableScale } from '../../lib/motion';
 import { useTheme } from '../../lib/useTheme';
 import { aISO, hoyISO, sumarDiasISO, fechaDeTurno } from '../../lib/fechas';
-import { limpiar, LIMITES, validarMedicamento, validarDosis, validarIndicacion } from '../../lib/validaciones';
+import { limpiar, normalizar, LIMITES, validarMedicamento, validarDosis, validarIndicacion } from '../../lib/validaciones';
+import { useMedicamentos, useCoberturaPreview } from '../../hooks';
 import { formatFechaLarga } from '../../lib/format';
 import type { CreateRecetaDTO } from '../../services';
 
@@ -50,6 +51,21 @@ export function RecetaForm({ pacientes, pacienteFijo, onSubmit, loading }: Props
     setErrores(e => { const { [campo]: _, ...resto } = e; return resto; });
   };
 
+  // Catálogo de medicamentos: si lo escrito coincide con uno (sin importar acentos/mayúsculas)
+  // se manda su id y el backend aplica la cobertura de la obra social del paciente.
+  const { data: catalogo } = useMedicamentos();
+  const pacienteId = pacienteFijo?.id ?? (form.pacienteId || undefined);
+  const delCatalogo = useMemo(
+    () => (catalogo ?? []).find(m => normalizar(m.nombre) === normalizar(form.medicamento)),
+    [catalogo, form.medicamento],
+  );
+  const sugerencias = useMemo(() => {
+    const q = normalizar(form.medicamento);
+    if (!q || delCatalogo) return [];
+    return (catalogo ?? []).filter(m => normalizar(m.nombre).includes(q)).slice(0, 5);
+  }, [catalogo, form.medicamento, delCatalogo]);
+  const { data: cobertura } = useCoberturaPreview(pacienteId, delCatalogo?.id);
+
   const presetActivo = PRESETS.find(d => sumarDiasISO(d) === validoHasta) ?? null;
 
   const enviar = async () => {
@@ -69,7 +85,8 @@ export function RecetaForm({ pacientes, pacienteFijo, onSubmit, loading }: Props
 
     await onSubmit({
       pacienteId,
-      medicamento: limpiar(form.medicamento),
+      medicamento: delCatalogo?.nombre ?? limpiar(form.medicamento),
+      medicamentoId: delCatalogo?.id,
       dosis: limpiar(form.dosis),
       indicacion: limpiar(form.indicacion),
       validoHasta: aISO(validoHasta),
@@ -112,8 +129,16 @@ export function RecetaForm({ pacientes, pacienteFijo, onSubmit, loading }: Props
         error={errores.medicamento}
         maxLength={LIMITES.medicamento}
         placeholder="Ej: Amoxicilina 500 mg"
-        className="mb-3"
+        className={sugerencias.length || cobertura ? 'mb-2' : 'mb-3'}
       />
+      {sugerencias.length ? (
+        <View className="flex-row flex-wrap gap-2 mb-3">
+          {sugerencias.map(m => (
+            <Chip key={m.id} label={m.nombre} onPress={() => set('medicamento')(m.nombre)} />
+          ))}
+        </View>
+      ) : null}
+      {cobertura && form.medicamento.trim() ? <AvisoCobertura c={cobertura} /> : null}
       <Input
         label="Dosis"
         value={form.dosis}
@@ -171,6 +196,28 @@ export function RecetaForm({ pacientes, pacienteFijo, onSubmit, loading }: Props
           deshabilitar={(fecha) => fecha <= hoyISO()}
         />
       </Sheet>
+    </View>
+  );
+}
+
+/** Le muestra al médico, antes de emitir, cuánto le va a cubrir la obra social al paciente. */
+function AvisoCobertura({ c }: { c: import('../../services').CoberturaPreview }) {
+  const { colors } = useTheme();
+  const cubre = c.porcentaje !== null && c.porcentaje > 0;
+  let texto: string;
+  if (c.porcentaje !== null) texto = `${c.obraSocial} cubre el ${c.porcentaje}% de este medicamento`;
+  else if (c.motivo === 'particular') texto = 'El paciente es particular: sin cobertura';
+  else if (c.motivo === 'credencial-vencida') texto = `La credencial de ${c.obraSocial} está vencida: sin cobertura`;
+  else if (c.motivo === 'sin-catalogo') texto = `No está en el catálogo: ${c.obraSocial} no aplica cobertura`;
+  else texto = `${c.obraSocial} no cubre este medicamento`;
+  return (
+    <View
+      className="rounded-lg px-3 py-2 mb-3"
+      style={{ backgroundColor: cubre ? colors.success.soft : colors.slate[100] }}
+    >
+      <Text className="text-[12px] font-semibold" style={{ color: cubre ? colors.success.text : colors.slate[500] }}>
+        {texto}
+      </Text>
     </View>
   );
 }

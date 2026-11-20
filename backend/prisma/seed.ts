@@ -72,6 +72,31 @@ await prisma.coberturaEspecialidad.upsert({
   create: { obraSocialId: swissMedical.id, especialidadId: pediatria.id, porcentajeCobertura: 70 },
 });
 
+  // Catálogo de medicamentos + cuánto cubre cada obra social
+  const nombresMedicamentos = ['Paracetamol 500 mg', 'Ibuprofeno 400 mg', 'Amoxicilina 500 mg', 'Omeprazol 20 mg', 'Enalapril 10 mg'];
+  const meds: Record<string, string> = {};
+  for (const nombre of nombresMedicamentos) {
+    const m = await prisma.medicamento.upsert({ where: { nombre }, update: {}, create: { nombre } });
+    meds[nombre] = m.id;
+  }
+  const coberturasMeds: [string, string, number][] = [
+    [swissMedical.id, 'Paracetamol 500 mg', 20],
+    [swissMedical.id, 'Amoxicilina 500 mg', 50],
+    [swissMedical.id, 'Enalapril 10 mg', 70],
+    [osde.id, 'Paracetamol 500 mg', 40],
+    [osde.id, 'Ibuprofeno 400 mg', 40],
+    [osde.id, 'Omeprazol 20 mg', 60],
+  ];
+  for (const [obraSocialId, nombre, porcentaje] of coberturasMeds) {
+    const medicamentoId = meds[nombre];
+    await prisma.coberturaMedicamento.upsert({
+      where: { obraSocialId_medicamentoId: { obraSocialId, medicamentoId } },
+      update: {},
+      create: { obraSocialId, medicamentoId, porcentaje },
+    });
+  }
+  console.log('Medicamentos y coberturas listos');
+
   const drGarcia = await prisma.medico.upsert({
     where: { matricula: 'MP-12345' },
     update: {},

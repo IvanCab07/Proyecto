@@ -58,6 +58,13 @@ function RecetaCard({ item, index }: { item: Receta; index: number }) {
           </View>
         </View>
         <View className="px-4 pb-4">
+          {item.coberturaPorcentaje != null ? (
+            <View className="self-start mb-2 px-2 py-1 rounded-lg" style={{ backgroundColor: colors.success.soft }}>
+              <Text className="text-[12px] font-bold" style={{ color: colors.success.text }}>
+                {item.coberturaObraSocial} te cubre el {item.coberturaPorcentaje}%
+              </Text>
+            </View>
+          ) : null}
           <Text className="text-sm text-slate-600 leading-5">{item.indicacion}</Text>
           <View className="flex-row items-center justify-between mt-3 pt-3 border-t border-slate-100">
             <View className="flex-row items-center gap-2">

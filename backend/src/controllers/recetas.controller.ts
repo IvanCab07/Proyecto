@@ -6,6 +6,8 @@ import { fechaDeEntrada, finDeHoy, sumarDias } from '../lib/fechas';
 import { assertPacienteDelMedico, fichaDelMedico } from '../lib/medicoPaciente';
 import { notify } from '../services/notifications.service';
 import { inferirHorariosPorDefecto } from './recordatorios.controller';
+import { buscarMedicamentoPorNombre } from './medicamentos.controller';
+import { calcularCobertura } from '../lib/cobertura';
 
 /**
  * Validez por defecto cuando el emisor no manda `validoHasta`.
@@ -30,6 +32,9 @@ const recetaSchema = z.object({
   pacienteId:  z.string().uuid(),
   medicoId:    z.string().uuid().optional(), // el médico logueado lo fija solo; el admin lo manda
   medicamento: z.string().min(2).max(80),
+  // Medicamento del catálogo. Si viene, el nombre sale del catálogo y se aplica la cobertura
+  // de la obra social. Si no, se intenta matchear `medicamento` por nombre.
+  medicamentoId: z.string().uuid().nullable().optional(),
   dosis:       z.string().min(1).max(80),
   indicacion:  z.string().min(5).max(500),
   // Sigue siendo opcional en la API (mobile todavía puede no mandarlo), pero nunca queda
@@ -65,7 +70,7 @@ export const crearReceta = async (req: Request, res: Response) => {
     return res.status(400).json({ error: formatZodError(result.error) });
   }
 
-  const { pacienteId, medicamento, dosis, indicacion, validoHasta } = result.data;
+  const { pacienteId, dosis, indicacion, validoHasta } = result.data;
 
   // El médico solo puede emitir a su nombre; el admin elige el médico
   let medicoId = result.data.medicoId;
@@ -83,9 +88,27 @@ export const crearReceta = async (req: Request, res: Response) => {
   if (!paciente) return res.status(404).json({ error: 'Paciente no encontrado' });
   if (!medico)   return res.status(404).json({ error: 'Médico no encontrado' });
 
+  // Resolver el medicamento del catálogo (por id, o por nombre si lo escribió a mano)
+  let medicamento = result.data.medicamento.trim();
+  let medicamentoId: string | null = null;
+  if (result.data.medicamentoId) {
+    const delCatalogo = await prisma.medicamento.findUnique({ where: { id: result.data.medicamentoId } });
+    if (!delCatalogo) throw new HttpError(404, 'Medicamento no encontrado en el catálogo');
+    medicamento = delCatalogo.nombre;
+    medicamentoId = delCatalogo.id;
+  } else {
+    const match = await buscarMedicamentoPorNombre(medicamento);
+    if (match) { medicamento = match.nombre; medicamentoId = match.id; }
+  }
+
+  // "Foto" de la cobertura de hoy: queda guardada en la receta
+  const cobertura = await calcularCobertura(pacienteId, medicamentoId);
+
   const receta = await prisma.receta.create({
     data: {
-      pacienteId, medicoId, medicamento, dosis, indicacion,
+      pacienteId, medicoId, medicamento, dosis, indicacion, medicamentoId,
+      coberturaObraSocial: cobertura.porcentaje !== null ? cobertura.obraSocial : null,
+      coberturaPorcentaje: cobertura.porcentaje,
       validoHasta: validoHasta ?? sumarDias(new Date(), VALIDEZ_POR_DEFECTO_DIAS),
     },
     include: {
@@ -121,6 +144,23 @@ export const crearReceta = async (req: Request, res: Response) => {
   }
 
   return res.status(201).json(receta);
+};
+
+// Médico o admin: preview de cuánto le cubre al paciente un medicamento, para mostrarlo en el
+// formulario ANTES de emitir. GET /recetas/cobertura?pacienteId=...&medicamentoId=...
+const previewSchema = z.object({
+  pacienteId:    z.string().uuid(),
+  medicamentoId: z.string().uuid().optional(),
+});
+
+export const getCoberturaPreview = async (req: Request, res: Response) => {
+  const result = previewSchema.safeParse(req.query);
+  if (!result.success) return res.status(400).json({ error: formatZodError(result.error) });
+
+  if (req.user!.role === 'MEDICO') {
+    await assertPacienteDelMedico(req.user!.userId, result.data.pacienteId);
+  }
+  return res.json(await calcularCobertura(result.data.pacienteId, result.data.medicamentoId));
 };
 
 // Médico o admin: eliminar una receta. El médico solo puede borrar las que emitió él;

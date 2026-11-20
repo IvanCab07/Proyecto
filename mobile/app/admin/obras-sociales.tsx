@@ -5,9 +5,9 @@ import { useRouter } from 'expo-router';
 import { useObrasSociales, useCrearObraSocial } from '../../hooks';
 import {
   Card, Button, Input, Sheet, ScreenHeader, EmptyState, Skeleton, toast,
-  IconPlus, IconCreditCard, IconSearch,
+  IconPlus, IconCreditCard, IconSearch, IconChevronRight,
 } from '../../components/ui';
-import { stagger } from '../../lib/motion';
+import { PressableScale, stagger } from '../../lib/motion';
 import { useTheme } from '../../lib/useTheme';
 import { apiError } from '../../lib/apiError';
 import { limpiar, normalizar, validarNombreObraSocial } from '../../lib/validaciones';
@@ -98,6 +98,10 @@ export default function ObrasSocialesScreen() {
             const pacientes = item._count?.pacientes ?? 0;
             return (
               <Animated.View entering={stagger(index)}>
+                <PressableScale
+                  haptic="select"
+                  onPress={() => router.push({ pathname: '/admin/obra-social/[id]', params: { id: item.id, nombre: item.nombre } })}
+                >
                 <Card className="flex-row items-center p-3.5">
                   <View className="w-12 h-12 rounded-xl bg-brand-50 items-center justify-center mr-3.5">
                     <IconCreditCard size={20} color={colors.brand[600]} />
@@ -112,7 +116,12 @@ export default function ObrasSocialesScreen() {
                       </View>
                     </View>
                   </View>
+                  <View className="items-end">
+                    <Text className="text-[11px] text-slate-400 mb-0.5">Medicamentos</Text>
+                    <IconChevronRight size={18} color={colors.slate[400]} />
+                  </View>
                 </Card>
+                </PressableScale>
               </Animated.View>
             );
           }}

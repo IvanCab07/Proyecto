@@ -6,6 +6,7 @@ import {
   obrasSocialesService,
   estudiosService,
   recetasService,
+  medicamentosService,
   usersService,
   authService,
   notificationsService,
@@ -177,6 +178,59 @@ export const useCrearObraSocial = () => {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['obras-sociales'] }),
   });
 };
+
+export const useCoberturas = (obraSocialId: string) =>
+  useQuery({
+    queryKey: ['coberturas', obraSocialId],
+    queryFn: () => obrasSocialesService.coberturas(obraSocialId),
+    enabled: !!obraSocialId,
+  });
+
+export const useGuardarCobertura = (obraSocialId: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ medicamentoId, porcentaje }: { medicamentoId: string; porcentaje: number }) =>
+      obrasSocialesService.guardarCobertura(obraSocialId, medicamentoId, porcentaje),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['coberturas', obraSocialId] });
+      qc.invalidateQueries({ queryKey: ['medicamentos'] });
+    },
+  });
+};
+
+export const useEliminarCobertura = (obraSocialId: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (medicamentoId: string) => obrasSocialesService.eliminarCobertura(obraSocialId, medicamentoId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['coberturas', obraSocialId] });
+      qc.invalidateQueries({ queryKey: ['medicamentos'] });
+    },
+  });
+};
+
+// ── Medicamentos (catálogo) ──
+export const useMedicamentos = () =>
+  useQuery({
+    queryKey: ['medicamentos'],
+    queryFn: medicamentosService.todos,
+  });
+
+export const useCrearMedicamento = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (nombre: string) => medicamentosService.crear(nombre),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['medicamentos'] }),
+  });
+};
+
+/** Preview de cobertura para el formulario de receta. Solo consulta si hay paciente. */
+export const useCoberturaPreview = (pacienteId: string | undefined, medicamentoId: string | undefined) =>
+  useQuery({
+    queryKey: ['cobertura-preview', pacienteId, medicamentoId],
+    queryFn: () => recetasService.coberturaPreview(pacienteId!, medicamentoId),
+    enabled: !!pacienteId,
+  });
 
 /**
  * Guarda la obra social del paciente logueado. Usa el mismo PATCH /auth/perfil que los datos

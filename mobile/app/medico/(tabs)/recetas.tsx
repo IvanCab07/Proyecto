@@ -95,7 +95,12 @@ export default function MedicoRecetas() {
                     <View className="w-10 h-10 rounded-xl bg-brand-50 items-center justify-center"><IconPill size={18} color={colors.brand[600]} /></View>
                     <View className="flex-1">
                       <Text className="text-[15px] font-bold text-slate-900" numberOfLines={1} style={{ letterSpacing: -0.3 }}>{item.medicamento}</Text>
-                      <Text className="text-[12px] text-brand-700 font-semibold">{item.dosis}</Text>
+                      <Text className="text-[12px] text-brand-700 font-semibold">
+                        {item.dosis}
+                        {item.coberturaPorcentaje != null ? (
+                          <Text className="text-slate-400 font-normal">{`  ·  ${item.coberturaObraSocial} ${item.coberturaPorcentaje}%`}</Text>
+                        ) : null}
+                      </Text>
                     </View>
                   </View>
                   <Text className="text-[11px] text-slate-400">{formatFechaCorta(item.fechaEmision)}</Text>

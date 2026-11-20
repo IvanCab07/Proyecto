@@ -11,6 +11,7 @@ export default function AdminLayout() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="especialidades" />
       <Stack.Screen name="obras-sociales" />
+      <Stack.Screen name="obra-social/[id]" />
       <Stack.Screen name="calificaciones" />
       <Stack.Screen name="ajustes" />
     </Stack>

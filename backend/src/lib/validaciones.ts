@@ -27,6 +27,7 @@ export const LIMITES = {
   // Cortar acá evita que alguien crea tener una contraseña más larga de la que realmente vale.
   passwordMax: 72,
   obraSocial: 50,
+  medicamento: 80,
 } as const;
 
 // Letras (con acentos y ñ) separadas por un único espacio, apóstrofo o guion.
@@ -74,6 +75,20 @@ export const especialidadNombreSchema = z
   .min(3)
   .max(LIMITES.obraSocial)
   .regex(RE_ESPECIALIDAD, 'solo puede tener letras, espacios y guiones');
+
+// Medicamentos del catálogo: letras, números y los símbolos de una presentación
+// ("Paracetamol 500 mg", "Amoxicilina + Ác. clavulánico 875/125").
+export const RE_MEDICAMENTO = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9][A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9 .,%+\/()-]*$/;
+
+export const medicamentoNombreSchema = z
+  .string()
+  .trim()
+  .min(2)
+  .max(LIMITES.medicamento)
+  .regex(RE_MEDICAMENTO, 'solo puede tener letras, números, espacios y . , % + / ( ) -');
+
+/** Porcentaje de cobertura: entero de 0 a 100. */
+export const porcentajeSchema = z.coerce.number().int().min(0).max(100);
 
 export const dniSchema = z
   .string()
