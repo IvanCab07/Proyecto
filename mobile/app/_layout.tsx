@@ -3,17 +3,12 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { ToastProvider, ConfirmProvider } from '../components/ui';
 import { useThemeStore } from '../hooks/useThemeStore';
 import { useTheme } from '../lib/useTheme';
+import { queryClient } from '../lib/queryClient';
 import '../global.css';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { staleTime: 1000 * 60 * 2, retry: 1 },
-  },
-});
 
 export default function RootLayout() {
   const { colors, isDark } = useTheme();

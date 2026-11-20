@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import { authService, User, LoginResult } from '../services';
+import { queryClient } from '../lib/queryClient';
 
 
 interface AuthState {
@@ -43,6 +44,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const result = await authService.login({ email, password });
       // Si la cuenta tiene 2FA, todavía no hay sesión: se completa en el 2do paso
       if ('token' in result) {
+        queryClient.clear(); // que no queden datos de otra cuenta usada en este celular
         set({ user: result.user, isAuthenticated: true });
       }
       return result;
@@ -55,6 +57,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const { user } = await authService.twoFactorLogin(challenge, code);
+      queryClient.clear();
       set({ user, isAuthenticated: true });
     } finally {
       set({ isLoading: false });
@@ -73,6 +76,8 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: async () => {
     await authService.logout();
+    // Vaciar la caché: el próximo que entre en este celular no tiene que ver datos de esta cuenta
+    queryClient.clear();
     set({ user: null, isAuthenticated: false });
   },
 }));

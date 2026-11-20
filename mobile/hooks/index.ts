@@ -194,6 +194,7 @@ export const useGuardarCobertura = (obraSocialId: string) => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['coberturas', obraSocialId] });
       qc.invalidateQueries({ queryKey: ['medicamentos'] });
+      qc.invalidateQueries({ queryKey: ['cobertura-preview'] });
     },
   });
 };
@@ -205,6 +206,7 @@ export const useEliminarCobertura = (obraSocialId: string) => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['coberturas', obraSocialId] });
       qc.invalidateQueries({ queryKey: ['medicamentos'] });
+      qc.invalidateQueries({ queryKey: ['cobertura-preview'] });
     },
   });
 };
@@ -224,12 +226,17 @@ export const useCrearMedicamento = () => {
   });
 };
 
-/** Preview de cobertura para el formulario de receta. Solo consulta si hay paciente. */
+/**
+ * Preview de cobertura para el formulario de receta. Solo consulta si hay paciente.
+ * staleTime 0: la obra social del paciente o el porcentaje pueden haber cambiado desde otro
+ * celular, así que cada vez que se abre el formulario se le vuelve a preguntar al backend.
+ */
 export const useCoberturaPreview = (pacienteId: string | undefined, medicamentoId: string | undefined) =>
   useQuery({
     queryKey: ['cobertura-preview', pacienteId, medicamentoId],
     queryFn: () => recetasService.coberturaPreview(pacienteId!, medicamentoId),
     enabled: !!pacienteId,
+    staleTime: 0,
   });
 
 /**
@@ -244,6 +251,7 @@ export const useActualizarObraSocial = () => {
       authService.actualizarPerfil(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['obras-sociales'] });
+      qc.invalidateQueries({ queryKey: ['cobertura-preview'] });
       return loadUser();
     },
   });
